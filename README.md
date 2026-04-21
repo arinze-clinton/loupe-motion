@@ -5,8 +5,9 @@
 
 <br>
 
-[![release](https://img.shields.io/github/v/release/arinze-clinton/loupe-motion?display_name=tag)](https://github.com/arinze-clinton/loupe-motion/releases)
-[![license](https://img.shields.io/badge/license-private-orange)](#license)
+[![npm version](https://img.shields.io/npm/v/@arinze-clinton/loupe)](https://www.npmjs.com/package/@arinze-clinton/loupe)
+[![downloads](https://img.shields.io/npm/dm/@arinze-clinton/loupe)](https://www.npmjs.com/package/@arinze-clinton/loupe)
+[![license](https://img.shields.io/badge/license-PolyForm%20Shield-blue)](LICENSE)
 
 **Loupe** is a timeline-first motion authoring tool for React. Scrub your animations, annotate frames inline, and export structured feedback your AI coding agent can act on.
 
@@ -17,7 +18,7 @@ npm install @arinze-clinton/loupe -D
 npx loupe init
 ```
 
-`loupe init` walks you through wiring the panel into your app and installs the bundled Claude skill so you can talk to Loupe in plain English from your editor.
+No registry config, no auth setup. `loupe init` walks you through wiring the panel into your app and installs the bundled Claude skill so you can talk to Loupe in plain English from your editor.
 
 ## Usage
 
@@ -99,4 +100,4 @@ Every `<TimelineProvider>` registers itself with the app-root `LoupeRegistryProv
 
 ## License
 
-Private to the Arinze Clinton team. Not licensed for external use.
+[PolyForm Shield 1.0.0](LICENSE) — use it freely in any project, including commercial work. You may not fork it into a competing product.

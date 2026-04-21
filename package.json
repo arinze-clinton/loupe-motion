@@ -1,8 +1,8 @@
 {
   "name": "@arinze-clinton/loupe",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Timeline-first motion authoring tool — scrub, annotate, and review React animations against a deterministic timeline.",
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "private": false,
   "type": "module",
   "main": "./dist/index.cjs",
@@ -25,8 +25,8 @@
     "README.md"
   ],
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com",
-    "access": "restricted"
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
   },
   "repository": {
     "type": "git",
