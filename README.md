@@ -1,9 +1,4 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.svg">
-  <img src="assets/logo.svg" alt="Loupe" width="200">
-</picture>
-
-<br>
+# Loupe
 
 [![release](https://img.shields.io/github/v/release/arinze-clinton/loupe-motion?display_name=tag)](https://github.com/arinze-clinton/loupe-motion/releases)
 [![license](https://img.shields.io/badge/license-private-orange)](#license)
