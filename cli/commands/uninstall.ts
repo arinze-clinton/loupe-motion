@@ -83,6 +83,9 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
         kleur.dim('(provider file created by init)'),
     );
     console.log(
+      `    • ${kleur.cyan(r.demoFile)} ` + kleur.dim('(demo scene)'),
+    );
+    console.log(
       `    • restore ${kleur.cyan(r.entryFile)} ` +
         kleur.dim(`from ${r.backupFile}`),
     );
@@ -152,6 +155,13 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
     } catch {
       /* already gone — ignore */
     }
+    try {
+      const demoAbs = path.join(cwd, r.demoFile);
+      await fs.rm(demoAbs, { force: true });
+      console.log(kleur.green('  ✓ removed ') + r.demoFile);
+    } catch {
+      /* already gone — ignore */
+    }
   }
 
   // 4. Prune empty Loupe parent dirs so the tree isn't littered.
@@ -184,7 +194,12 @@ function uninstallArgsFor(pm: 'npm' | 'yarn' | 'pnpm' | 'bun'): string[] {
  * the matching `loupe-provider.tsx` sibling.
  */
 async function findAutoWireReverts(cwd: string): Promise<
-  Array<{ entryFile: string; backupFile: string; providerFile: string }>
+  Array<{
+    entryFile: string;
+    backupFile: string;
+    providerFile: string;
+    demoFile: string;
+  }>
 > {
   const candidates = [
     'app/layout.tsx',
@@ -196,6 +211,7 @@ async function findAutoWireReverts(cwd: string): Promise<
     entryFile: string;
     backupFile: string;
     providerFile: string;
+    demoFile: string;
   }> = [];
   for (const entry of candidates) {
     const backup = `${entry}.loupe-backup`;
@@ -204,11 +220,12 @@ async function findAutoWireReverts(cwd: string): Promise<
     } catch {
       continue;
     }
-    const provider = path.join(path.dirname(entry), 'loupe-provider.tsx');
+    const dir = path.dirname(entry);
     results.push({
       entryFile: entry,
       backupFile: backup,
-      providerFile: provider,
+      providerFile: path.join(dir, 'loupe-provider.tsx'),
+      demoFile: path.join(dir, 'loupe-demo-scene.tsx'),
     });
   }
   return results;

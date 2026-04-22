@@ -233,6 +233,33 @@ async function isPortListening(port: number, timeoutMs: number): Promise<boolean
 }
 
 /**
+ * Open a URL in the user's default browser. Best-effort — if the
+ * OS-specific command isn't available, we return false and the
+ * caller prints a "open this URL" message instead.
+ */
+export async function openInBrowser(url: string): Promise<boolean> {
+  const { spawn } = await import('node:child_process');
+  const platform = process.platform;
+  const cmd =
+    platform === 'darwin'
+      ? 'open'
+      : platform === 'win32'
+        ? 'start'
+        : 'xdg-open';
+  try {
+    const child = spawn(cmd, [url], {
+      detached: true,
+      stdio: 'ignore',
+      shell: platform === 'win32', // `start` needs a shell
+    });
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The package-manager-appropriate command for `pnpm dev` etc.
  * Most projects define a `dev` script; we just invoke it.
  */

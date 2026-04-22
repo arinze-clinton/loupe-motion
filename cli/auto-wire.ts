@@ -31,6 +31,8 @@ export type AutoWireResult = {
   backupFile: string;
   /** Relative path of the new provider file we created. */
   providerFile: string;
+  /** Relative path of the demo-scene file we created. */
+  demoFile: string;
 };
 
 export async function autoWireNextjs(cwd: string): Promise<AutoWireResult | null> {
@@ -73,10 +75,19 @@ export async function autoWireNextjs(cwd: string): Promise<AutoWireResult | null
   const entryDir = path.dirname(entryRel);
   const providerRel = path.join(entryDir, 'loupe-provider.tsx');
   const providerAbs = path.join(cwd, providerRel);
+  const demoRel = path.join(entryDir, 'loupe-demo-scene.tsx');
+  const demoAbs = path.join(cwd, demoRel);
   const backupRel = `${entryRel}.loupe-backup`;
   const backupAbs = path.join(cwd, backupRel);
 
-  // 1. Write the client provider file.
+  // 1a. Write the demo-scene file so first-run users see Loupe
+  //     working immediately without having to wire their own scenes.
+  //     User can replace it with their real scenes later, or delete
+  //     the file + the import from loupe-provider.tsx.
+  await fs.writeFile(demoAbs, NEXTJS_DEMO_SCENE_TEMPLATE, 'utf8');
+
+  // 1b. Write the client provider file — imports the demo by default
+  //     so Loupe has a scene to drive on first run.
   await fs.writeFile(providerAbs, NEXTJS_PROVIDER_TEMPLATE, 'utf8');
 
   // 2. Back up the entry file.
@@ -98,6 +109,7 @@ export async function autoWireNextjs(cwd: string): Promise<AutoWireResult | null
     entryFile: entryRel,
     backupFile: backupRel,
     providerFile: providerRel,
+    demoFile: demoRel,
   };
 }
 
@@ -134,6 +146,9 @@ import {
   AnnotationPins,
 } from '@arinze-clinton/loupe';
 import '@arinze-clinton/loupe/styles.css';
+// Demo scene so Loupe has something to drive on first run.
+// Replace with your real scenes, or delete both lines when done.
+import { LoupeDemoScene } from './loupe-demo-scene';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -144,6 +159,8 @@ export function LoupeProvider({ children }: { children: React.ReactNode }) {
         {children}
         {isDev && (
           <>
+            {/* Delete <LoupeDemoScene /> once you've wired your own scenes. */}
+            <LoupeDemoScene />
             <LoupePanel />
             <AnnotationOverlay />
             <AnnotationPins />
@@ -151,6 +168,63 @@ export function LoupeProvider({ children }: { children: React.ReactNode }) {
         )}
       </AnnotationsProvider>
     </LoupeRegistryProvider>
+  );
+}
+`;
+
+const NEXTJS_DEMO_SCENE_TEMPLATE = `'use client';
+
+// Loupe demo scene — shows Loupe is working on first install.
+// Replace with your real scenes, or delete this file and the
+// \`<LoupeDemoScene />\` line in \`loupe-provider.tsx\` when ready.
+//
+// This scene has 4 phases — idle → enter → hold → exit. Scrub
+// the Loupe timeline to see the dot + color respond to time.
+
+import { useTimelineValue, TimelineProvider } from '@arinze-clinton/loupe';
+
+const DEMO_CONFIG = {
+  id: 'loupe-demo',
+  label: 'Demo',
+  phaseOrder: ['idle', 'enter', 'hold', 'exit'] as const,
+  phaseDurations: { idle: 400, enter: 700, hold: 900, exit: 600 },
+};
+
+export function LoupeDemoScene() {
+  return (
+    <TimelineProvider config={DEMO_CONFIG}>
+      <DemoDot />
+    </TimelineProvider>
+  );
+}
+
+function DemoDot() {
+  const x = useTimelineValue(-120, 120, { phase: 'enter' });
+  const xHold = useTimelineValue(120, 120, { phase: 'hold' });
+  const xExit = useTimelineValue(120, 240, { phase: 'exit' });
+  const opacity = useTimelineValue(0, 1, { phase: 'enter' });
+  const opacityExit = useTimelineValue(1, 0, { phase: 'exit' });
+  const hue = useTimelineValue(210, 340, { phase: 'hold' });
+
+  return (
+    <div
+      aria-hidden
+      style={{
+        position: 'fixed',
+        bottom: 24,
+        left: 80,
+        width: 40,
+        height: 40,
+        borderRadius: 999,
+        background: \`hsl(\${hue}, 85%, 58%)\`,
+        transform: \`translateX(\${x.get() + xHold.get() - 120 + xExit.get() - 120}px)\`,
+        opacity: opacity.get() * opacityExit.get(),
+        pointerEvents: 'none',
+        zIndex: 9999,
+        transition: 'background 120ms linear',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+      }}
+    />
   );
 }
 `;

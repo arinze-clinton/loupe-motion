@@ -11,6 +11,7 @@ import {
   detectRunningDevServer,
   devCommand,
   loupeInvocation,
+  openInBrowser,
   warnOnInvokerMismatch,
   type Framework,
 } from '../util.js';
@@ -165,6 +166,7 @@ export async function init({ cwd }: InitOptions): Promise<void> {
       wire = await autoWireNextjs(cwd);
       if (wire) {
         console.log(kleur.green('  ✓ ') + wire.providerFile);
+        console.log(kleur.green('  ✓ ') + wire.demoFile + kleur.dim('  (demo scene — delete when done)'));
         console.log(kleur.green('  ✓ ') + `${wire.entryFile} (backup → ${wire.backupFile})`);
       } else {
         console.log(
@@ -191,47 +193,64 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   console.log();
 
   if (wire) {
-    // AUTO-WIRED PATH — no manual paste step, just pick a scene and go.
-    console.log(
-      '  ' +
-        kleur.bold('1.') +
-        ' Pick ONE animation in your app and wrap it in ' +
-        kleur.cyan('<TimelineProvider>') +
-        '.',
-    );
-    console.log(
-      '     See ' +
-        kleur.cyan('loupe.example.tsx') +
-        ' for the exact syntax.',
-    );
-    console.log();
+    // AUTO-WIRED PATH — nothing for the user to do.
     if (running) {
+      console.log(kleur.bold().green('  ✓ All set.'));
+      console.log();
       console.log(
-        '  ' +
-          kleur.bold('2.') +
-          ' Your dev server is already running at ' +
+        '  Your dev server at ' +
           kleur.cyan(running.url) +
-          '.',
+          ' will auto-reload. A moving dot will appear in the',
       );
       console.log(
-        '     Save the file → page refreshes → floating ' +
+        '  bottom-left of your page — that\'s the Loupe demo scene. The floating ' +
           kleur.cyan('Loupe') +
-          ' panel appears in the corner.',
+          ' panel shows',
       );
+      console.log('  up in the corner; click the scene dropdown and scrub.');
+      console.log();
+
+      // Try to open the browser. If it works, tell the user so they
+      // know what just happened; if not, print the URL instead.
+      const opened = await openInBrowser(running.url);
+      if (opened) {
+        console.log(
+          kleur.dim('  Opened ') + kleur.cyan(running.url) + kleur.dim(' in your browser.'),
+        );
+      } else {
+        console.log(
+          kleur.dim('  Open ') + kleur.cyan(running.url) + kleur.dim(' in your browser to see it.'),
+        );
+      }
     } else {
+      console.log(kleur.bold().green('  ✓ All set. One thing left:'));
+      console.log();
       console.log(
-        '  ' +
-          kleur.bold('2.') +
-          ' Start your dev server with ' +
+        '  Start your dev server with ' +
           kleur.cyan(devCommand(pm)) +
-          '.',
+          ', then open the URL it prints.',
       );
       console.log(
-        '     Open the URL it prints — floating ' +
+        '  A moving dot appears in the bottom-left — that\'s the Loupe demo scene.',
+      );
+      console.log(
+        '  The floating ' +
           kleur.cyan('Loupe') +
-          ' panel appears in the corner.',
+          ' panel shows up in the corner.',
       );
     }
+    console.log();
+    console.log(
+      kleur.dim('  When you\'re ready for your own scenes, edit ') +
+        kleur.cyan(wire.providerFile),
+    );
+    console.log(
+      kleur.dim('  and replace ') +
+        kleur.cyan('<LoupeDemoScene />') +
+        kleur.dim(' with your own ') +
+        kleur.cyan('<TimelineProvider>') +
+        kleur.dim('s.'),
+    );
     console.log();
     printGoodToKnow(invocation);
     return;
