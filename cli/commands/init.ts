@@ -1,5 +1,6 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import kleur from 'kleur';
 import prompts from 'prompts';
 import {
@@ -9,6 +10,10 @@ import {
   loupeInvocation,
   warnOnInvokerMismatch,
 } from '../util.js';
+
+// tsup ships this file as ESM; `__dirname` isn't defined there.
+// Recompute from `import.meta.url` so the skill-file lookup works.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
  * `loupe init` — sets up Loupe in a host project.
