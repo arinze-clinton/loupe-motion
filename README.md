@@ -24,26 +24,26 @@ npx loupe init
 **pnpm**
 ```bash
 pnpm add @arinze-clinton/loupe -D
-pnpm dlx loupe init
+pnpm exec loupe init
 ```
 
 **yarn**
 ```bash
 yarn add @arinze-clinton/loupe -D
-yarn dlx loupe init
+yarn loupe init
 ```
 
 **bun**
 ```bash
 bun add @arinze-clinton/loupe -D
-bunx loupe init
+bun x loupe init
 ```
 
 No registry config, no auth setup. `loupe init` walks you through wiring the panel into your app and installs the bundled Claude skill so you can talk to Loupe in plain English from your editor.
 
 If Loupe is already installed in this project, `loupe init` will say so and show you the installed version instead of re-prompting.
 
-> The three commands below all show `npx` for brevity. Swap `npx` → `pnpm dlx`, `yarn dlx`, or `bunx` depending on your package manager.
+> The commands below all show `npx loupe <cmd>` for brevity. Swap the prefix for your package manager: `pnpm exec loupe`, `yarn loupe`, or `bun x loupe`. (`pnpm dlx` / `yarn dlx` / `bunx` also work but re-fetch from the registry every run; use them when Loupe isn't installed yet.)
 
 ### Check your version
 
