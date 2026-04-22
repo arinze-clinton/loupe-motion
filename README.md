@@ -43,7 +43,16 @@ No registry config, no auth setup. `loupe init` walks you through wiring the pan
 
 If Loupe is already installed in this project, `loupe init` will say so and show you the installed version instead of re-prompting.
 
-> The commands below all show `npx loupe <cmd>` for brevity. Swap the prefix for your package manager: `pnpm exec loupe`, `yarn loupe`, or `bun x loupe`. (`pnpm dlx` / `yarn dlx` / `bunx` also work but re-fetch from the registry every run; use them when Loupe isn't installed yet.)
+> The commands below use `npx loupe …`. If you're on pnpm, yarn, or bun, replace `npx` with your package manager's equivalent:
+>
+> | Package manager | Replace `npx` with |
+> |---|---|
+> | npm | `npx` |
+> | pnpm | `pnpm exec` |
+> | yarn | `yarn` |
+> | bun | `bun x` |
+>
+> Example: `pnpm exec loupe check`, `yarn loupe check`, `bun x loupe check`.
 
 ### Check your version
 
