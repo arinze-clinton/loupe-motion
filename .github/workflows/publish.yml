@@ -25,7 +25,22 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Skip publishing if this version is already on the registry.
+      # Enables re-pushing old tags (e.g. for retroactive Releases)
+      # without crashing the workflow on "version already published".
+      - name: Check if already published
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@arinze-clinton/loupe@$VERSION" version >/dev/null 2>&1; then
+            echo "Version $VERSION is already on the registry — skipping publish."
+            echo "already=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish
+        if: steps.check.outputs.already != 'true'
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

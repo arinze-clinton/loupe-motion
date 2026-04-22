@@ -41,7 +41,8 @@
     "build": "tsup && node -e \"require('fs').mkdirSync('dist',{recursive:true}); require('fs').writeFileSync('dist/styles.css','/* Loupe — panel uses inline styles. This file exists to satisfy the \\`@arinze-clinton/loupe/styles.css\\` import kept for backward compatibility with older generated code. */\\n')\"",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "postpublish": "node -e \"const v='v'+require('./package.json').version; require('child_process').execSync('git tag -f '+v+' && git push origin '+v, {stdio:'inherit'})\""
   },
   "peerDependencies": {
     "framer-motion": ">=11",

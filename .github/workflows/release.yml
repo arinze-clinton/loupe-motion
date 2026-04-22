@@ -1,0 +1,45 @@
+name: Create GitHub Release
+
+# Fires on tag push — creates a GitHub Release for the tag with
+# the tag's commit message as the body. Runs in parallel with
+# `publish.yml` (which handles npm publishing) so the Releases
+# tab stays in sync with every published version.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Derive release metadata
+        id: meta
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          # Use the tagged commit's subject + body as the release notes
+          # — our commit messages are already written as changelogs.
+          NOTES_FILE="$(mktemp)"
+          git log -1 --format="%B" "$TAG" > "$NOTES_FILE"
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "${{ steps.meta.outputs.tag }}" > /dev/null 2>&1; then
+            echo "Release for ${{ steps.meta.outputs.tag }} already exists — skipping."
+            exit 0
+          fi
+          gh release create "${{ steps.meta.outputs.tag }}" \
+            --title "${{ steps.meta.outputs.tag }}" \
+            --notes-file "${{ steps.meta.outputs.notes_file }}"
