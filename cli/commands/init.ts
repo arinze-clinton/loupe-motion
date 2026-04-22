@@ -139,10 +139,56 @@ export async function init({ cwd }: InitOptions): Promise<void> {
 
   console.log();
   console.log(kleur.bold('Next steps'));
-  console.log('  1. Open ' + kleur.cyan('loupe.example.tsx') + ' and copy the wiring into your app root.');
-  console.log('  2. Wrap any animated scene in ' + kleur.cyan('<TimelineProvider>') + '.');
+  console.log();
   console.log(
-    `  3. Run ${kleur.cyan(invocation('scan'))} to see which animations are timeline-bound.`,
+    '  ' +
+      kleur.bold('1.') +
+      ' Open the file ' +
+      kleur.cyan('loupe.example.tsx') +
+      ' (just created in this folder).',
+  );
+  console.log('     It has a commented block showing exactly how to mount Loupe.');
+  console.log();
+  console.log(
+    '  ' +
+      kleur.bold('2.') +
+      ' Find your app\'s top-level entry file. Typically one of:',
+  );
+  console.log(
+    kleur.dim('       • Next.js:') + '  app/layout.tsx (or src/app/layout.tsx)',
+  );
+  console.log(kleur.dim('       • Vite:   ') + '  src/main.tsx or src/App.tsx');
+  console.log(kleur.dim('       • Remix:  ') + '  app/root.tsx');
+  console.log(
+    '     Paste the wiring from ' +
+      kleur.cyan('loupe.example.tsx') +
+      ' into that file,',
+  );
+  console.log('     following the comments for where to put each piece.');
+  console.log();
+  console.log(
+    '  ' +
+      kleur.bold('3.') +
+      ' For each animation you want to review, wrap it in',
+  );
+  console.log(
+    '     ' + kleur.cyan('<TimelineProvider config={…}>') + '. The example',
+  );
+  console.log("     shows how. Don't worry about all animations at once —");
+  console.log('     start with one scene and expand from there.');
+  console.log();
+  console.log(
+    '  ' +
+      kleur.bold('4.') +
+      ' Start your dev server and look for the floating ' +
+      kleur.cyan('Loupe') +
+      ' panel.',
+  );
+  console.log('     Click any scene in the dropdown → scrub, pause, annotate.');
+  console.log();
+  console.log(
+    kleur.dim('  Need the full walkthrough? ') +
+      kleur.cyan('https://github.com/arinze-clinton/loupe-motion'),
   );
   console.log();
   console.log(kleur.dim('Good to know'));
@@ -150,6 +196,11 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     kleur.dim('  • ') +
       kleur.cyan(invocation('check')) +
       kleur.dim('     see your installed version + check for updates'),
+  );
+  console.log(
+    kleur.dim('  • ') +
+      kleur.cyan(invocation('scan')) +
+      kleur.dim('      list animations that are timeline-bound'),
   );
   console.log(
     kleur.dim('  • ') +
