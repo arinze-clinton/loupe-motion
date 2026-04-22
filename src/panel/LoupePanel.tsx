@@ -209,6 +209,16 @@ export function LoupePanel() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
+  // Re-attach the ResizeObserver whenever the element under
+  // `panelRef` changes. That happens on `expanded` toggles AND on
+  // collapse/expand transitions (CollapsedPanel ↔ ActiveScenePanel
+  // are different elements sharing the same ref). Without
+  // `activeSceneId` in the deps, the observer stays bound to the
+  // unmounted node after transition → `panelSize` keeps the old
+  // (pill) dimensions → drag constraints stay permissive → the
+  // newly-expanded panel renders past the safe area at edge
+  // positions. Including `activeSceneId` here forces re-observation
+  // against the new element on every swap.
   useLayoutEffect(() => {
     const el = panelRef.current;
     if (!el) return;
@@ -224,7 +234,7 @@ export function LoupePanel() {
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [expanded]);
+  }, [expanded, registry.activeSceneId]);
 
   useEffect(() => {
     if (panelSize.w === 0) return;
