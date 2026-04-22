@@ -241,15 +241,8 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     }
     console.log();
     console.log(
-      kleur.dim('  When you\'re ready for your own scenes, edit ') +
-        kleur.cyan(wire.providerFile),
-    );
-    console.log(
-      kleur.dim('  and replace ') +
-        kleur.cyan('<LoupeDemoScene />') +
-        kleur.dim(' with your own ') +
-        kleur.cyan('<TimelineProvider>') +
-        kleur.dim('s.'),
+      kleur.dim('  Want to review your own animations later? ') +
+        kleur.cyan('https://github.com/arinze-clinton/loupe-motion'),
     );
     console.log();
     printGoodToKnow(invocation);
@@ -336,11 +329,6 @@ export async function init({ cwd }: InitOptions): Promise<void> {
 }
 
 function printGoodToKnow(invocation: (cmd: string) => string): void {
-  console.log(
-    kleur.dim('  Need the full walkthrough? ') +
-      kleur.cyan('https://github.com/arinze-clinton/loupe-motion'),
-  );
-  console.log();
   console.log(kleur.dim('Good to know'));
   console.log(
     kleur.dim('  • ') +
