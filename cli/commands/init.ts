@@ -2,7 +2,13 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import kleur from 'kleur';
 import prompts from 'prompts';
-import { checkInstall } from '../util.js';
+import {
+  checkInstall,
+  detectInvoker,
+  detectPackageManager,
+  loupeInvocation,
+  warnOnInvokerMismatch,
+} from '../util.js';
 
 /**
  * `loupe init` — sets up Loupe in a host project.
@@ -28,6 +34,8 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   // twice should tell the user what's already there rather than
   // silently re-prompt and risk overwriting custom wiring.
   const existing = await checkInstall(cwd);
+  const pm = await detectPackageManager(cwd);
+  warnOnInvokerMismatch(kleur, pm, detectInvoker(), 'init');
   if (existing.resolved || existing.declared) {
     const installed = existing.installedVersion ?? kleur.dim('not resolved');
     const declared = existing.declaredRange ?? kleur.dim('not declared');
@@ -43,14 +51,12 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     );
     console.log();
     console.log(
-      '  Run ' +
-        kleur.cyan('npx loupe check') +
-        ' anytime to see your version and check for updates.',
+      `  Run ${kleur.cyan(loupeInvocation(pm, 'check', 'local'))} ` +
+        'anytime to see your version and check for updates.',
     );
     console.log(
-      '  Run ' +
-        kleur.cyan('npx loupe uninstall') +
-        ' to remove Loupe cleanly.',
+      `  Run ${kleur.cyan(loupeInvocation(pm, 'uninstall', 'local'))} ` +
+        'to remove Loupe cleanly.',
     );
     console.log();
 
@@ -124,21 +130,25 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     }
   }
 
+  const invocation = (cmd: string) => loupeInvocation(pm, cmd, 'local');
+
   console.log();
   console.log(kleur.bold('Next steps'));
   console.log('  1. Open ' + kleur.cyan('loupe.example.tsx') + ' and copy the wiring into your app root.');
   console.log('  2. Wrap any animated scene in ' + kleur.cyan('<TimelineProvider>') + '.');
-  console.log('  3. Run ' + kleur.cyan('npx loupe scan') + ' to see which animations are timeline-bound.');
+  console.log(
+    `  3. Run ${kleur.cyan(invocation('scan'))} to see which animations are timeline-bound.`,
+  );
   console.log();
   console.log(kleur.dim('Good to know'));
   console.log(
     kleur.dim('  • ') +
-      kleur.cyan('npx loupe check') +
+      kleur.cyan(invocation('check')) +
       kleur.dim('     see your installed version + check for updates'),
   );
   console.log(
     kleur.dim('  • ') +
-      kleur.cyan('npx loupe uninstall') +
+      kleur.cyan(invocation('uninstall')) +
       kleur.dim(' remove Loupe cleanly from this project'),
   );
   console.log();

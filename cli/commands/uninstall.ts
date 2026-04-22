@@ -3,7 +3,12 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import kleur from 'kleur';
 import prompts from 'prompts';
-import { checkInstall, detectPackageManager } from '../util.js';
+import {
+  checkInstall,
+  detectInvoker,
+  detectPackageManager,
+  warnOnInvokerMismatch,
+} from '../util.js';
 
 /**
  * `loupe uninstall` — clean exit ramp.
@@ -36,14 +41,14 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
   console.log();
 
   const info = await checkInstall(cwd);
+  const pm = await detectPackageManager(cwd);
+  warnOnInvokerMismatch(kleur, pm, detectInvoker(), 'uninstall');
   if (!info.declared && !info.resolved) {
     console.log(kleur.yellow('  Loupe is not installed in this project.'));
     console.log('  Nothing to do.');
     console.log();
     return;
   }
-
-  const pm = await detectPackageManager(cwd);
 
   // Gather which Loupe-authored files actually exist + are removable.
   const removableFiles: string[] = [];

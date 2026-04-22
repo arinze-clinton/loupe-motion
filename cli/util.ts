@@ -127,13 +127,31 @@ export async function fetchLatestNpmVersion(): Promise<string | null> {
   }
 }
 
+export type PackageManager = 'npm' | 'yarn' | 'pnpm' | 'bun';
+
+/**
+ * Detect which package manager INVOKED this CLI, from npm's
+ * standard `npm_config_user_agent` environment variable (pnpm,
+ * yarn, and bun all set it too). Returns null if we can't tell
+ * — common when the CLI is run directly (e.g. `node dist/cli/index.js`).
+ */
+export function detectInvoker(): PackageManager | null {
+  const ua = process.env.npm_config_user_agent ?? '';
+  if (!ua) return null;
+  if (ua.startsWith('pnpm/')) return 'pnpm';
+  if (ua.startsWith('yarn/')) return 'yarn';
+  if (ua.startsWith('bun/')) return 'bun';
+  if (ua.startsWith('npm/')) return 'npm';
+  return null;
+}
+
 /**
  * Detect which package manager the host project uses.
  * Best-effort — falls back to `npm` if nothing identifiable.
  */
 export async function detectPackageManager(
   cwd: string,
-): Promise<'npm' | 'yarn' | 'pnpm' | 'bun'> {
+): Promise<PackageManager> {
   const checks: Array<[string, 'npm' | 'yarn' | 'pnpm' | 'bun']> = [
     ['pnpm-lock.yaml', 'pnpm'],
     ['yarn.lock', 'yarn'],
@@ -149,6 +167,99 @@ export async function detectPackageManager(
     }
   }
   return 'npm';
+}
+
+/**
+ * Warn (non-fatal) when the CLI was invoked with the wrong
+ * package-manager prefix for this project. Catches e.g. a pnpm
+ * workspace being driven with `npx loupe …` — command still runs,
+ * but we tell the user their PM's equivalent so future invocations
+ * don't trip the "could not determine executable" resolver hole.
+ */
+export function warnOnInvokerMismatch(
+  kleurInstance: {
+    yellow: (s: string) => string;
+    cyan: (s: string) => string;
+    dim: (s: string) => string;
+  },
+  projectPm: PackageManager,
+  invoker: PackageManager | null,
+  cmd: string,
+): void {
+  if (!invoker || invoker === projectPm) return;
+  const correct = loupeInvocation(projectPm, cmd, 'local');
+  console.log();
+  console.log(
+    kleurInstance.yellow('  ! ') +
+      `This looks like a ${kleurInstance.cyan(projectPm)} project ` +
+      `but you invoked via ${kleurInstance.cyan(invoker)}.`,
+  );
+  console.log(
+    kleurInstance.dim('    Prefer: ') + kleurInstance.cyan(correct),
+  );
+}
+
+/**
+ * Build the right way to invoke a Loupe CLI command for the
+ * detected package manager, in whatever mode the caller needs:
+ *
+ *   mode 'local'  → assumes Loupe is installed; runs the binary
+ *                    from node_modules/.bin. Fast, no network.
+ *   mode 'remote' → pulls from the npm registry each time. Works
+ *                    even when Loupe isn't installed in the project.
+ *
+ * Keeps printed instructions honest across npm/pnpm/yarn/bun — a
+ * pnpm user shouldn't be told `npx loupe check` and then fail.
+ */
+export function loupeInvocation(
+  pm: 'npm' | 'yarn' | 'pnpm' | 'bun',
+  cmd: string,
+  mode: 'local' | 'remote',
+): string {
+  if (mode === 'local') {
+    switch (pm) {
+      case 'pnpm':
+        return `pnpm exec loupe ${cmd}`;
+      case 'yarn':
+        return `yarn loupe ${cmd}`;
+      case 'bun':
+        return `bun x loupe ${cmd}`;
+      case 'npm':
+      default:
+        return `npx loupe ${cmd}`;
+    }
+  }
+  // remote — fetch from the registry each run
+  switch (pm) {
+    case 'pnpm':
+      return `pnpm dlx @arinze-clinton/loupe ${cmd}`;
+    case 'yarn':
+      return `yarn dlx @arinze-clinton/loupe ${cmd}`;
+    case 'bun':
+      return `bunx @arinze-clinton/loupe ${cmd}`;
+    case 'npm':
+    default:
+      return `npx @arinze-clinton/loupe ${cmd}`;
+  }
+}
+
+/** Build the right install command for the detected PM. */
+export function installCommand(
+  pm: 'npm' | 'yarn' | 'pnpm' | 'bun',
+  devOnly = true,
+): string {
+  const flag = devOnly ? ' -D' : '';
+  switch (pm) {
+    case 'pnpm':
+      return `pnpm add @arinze-clinton/loupe${flag}`;
+    case 'yarn':
+      return `yarn add @arinze-clinton/loupe${flag}`;
+    case 'bun':
+      return `bun add @arinze-clinton/loupe${flag}`;
+    case 'npm':
+    default:
+      return `npm install @arinze-clinton/loupe${flag}`;
+  }
 }
 
 /** Compare two semver-ish version strings (X.Y.Z). Negative = a<b,

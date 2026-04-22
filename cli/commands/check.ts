@@ -1,8 +1,13 @@
 import kleur from 'kleur';
 import {
   checkInstall,
+  detectInvoker,
+  detectPackageManager,
   fetchLatestNpmVersion,
+  installCommand,
+  loupeInvocation,
   semverCompare,
+  warnOnInvokerMismatch,
   LOUPE_VERSION,
 } from '../util.js';
 
@@ -31,16 +36,15 @@ export async function check({ cwd, offline }: CheckOptions): Promise<void> {
   console.log();
 
   const info = await checkInstall(cwd);
+  const pm = await detectPackageManager(cwd);
+  warnOnInvokerMismatch(kleur, pm, detectInvoker(), 'check');
 
   if (!info.declared && !info.resolved) {
     console.log(kleur.yellow('  Loupe is not installed in this project.'));
     console.log();
     console.log(
-      '  Add it with ' +
-        kleur.cyan('npm install @arinze-clinton/loupe -D') +
-        ' then run ' +
-        kleur.cyan('npx loupe init') +
-        '.',
+      `  Add it with ${kleur.cyan(installCommand(pm))} ` +
+        `then run ${kleur.cyan(loupeInvocation(pm, 'init', 'local'))}.`,
     );
     console.log();
     return;
@@ -78,10 +82,15 @@ export async function check({ cwd, offline }: CheckOptions): Promise<void> {
   if (info.installedVersion) {
     const cmp = semverCompare(info.installedVersion, latest);
     if (cmp < 0) {
+      const upgradeCmd =
+        installCommand(pm, false).replace(
+          '@arinze-clinton/loupe',
+          '@arinze-clinton/loupe@latest',
+        );
       console.log(
         kleur.yellow('  ↑ Update available.') +
           ' Run ' +
-          kleur.cyan('npm install @arinze-clinton/loupe@latest') +
+          kleur.cyan(upgradeCmd) +
           '.',
       );
     } else if (cmp === 0) {
