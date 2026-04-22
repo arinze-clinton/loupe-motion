@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import kleur from 'kleur';
 import prompts from 'prompts';
+import { checkInstall } from '../util.js';
 
 /**
  * `loupe init` — sets up Loupe in a host project.
@@ -22,6 +23,48 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   console.log();
   console.log(kleur.bold().cyan('Loupe ✦ ') + 'timeline-first motion authoring');
   console.log(kleur.dim('Setting up Loupe in this project.\n'));
+
+  // Bail early if Loupe is already installed — running `loupe init`
+  // twice should tell the user what's already there rather than
+  // silently re-prompt and risk overwriting custom wiring.
+  const existing = await checkInstall(cwd);
+  if (existing.resolved || existing.declared) {
+    const installed = existing.installedVersion ?? kleur.dim('not resolved');
+    const declared = existing.declaredRange ?? kleur.dim('not declared');
+    console.log(
+      kleur.yellow('  Loupe is already installed in this project.'),
+    );
+    console.log(`    Installed: ${kleur.bold(installed)}`);
+    console.log(
+      `    Declared:  ${kleur.bold(String(declared))}` +
+        (existing.declaredIn
+          ? kleur.dim(`  (${existing.declaredIn})`)
+          : ''),
+    );
+    console.log();
+    console.log(
+      '  Run ' +
+        kleur.cyan('npx loupe check') +
+        ' anytime to see your version and check for updates.',
+    );
+    console.log(
+      '  Run ' +
+        kleur.cyan('npx loupe uninstall') +
+        ' to remove Loupe cleanly.',
+    );
+    console.log();
+
+    // Still offer to (re)write the sample wiring / skill for users
+    // who want to regenerate them — but only after explicit confirm.
+    const { proceed } = await prompts({
+      type: 'confirm',
+      name: 'proceed',
+      message: 'Re-run the init prompts anyway (regenerate wiring + skill)?',
+      initial: false,
+    });
+    if (!proceed) return;
+    console.log();
+  }
 
   const answers = await prompts([
     {
@@ -45,7 +88,8 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     {
       type: 'confirm',
       name: 'installSkill',
-      message: 'Install the Claude skill so you can talk to Loupe in plain English?',
+      message:
+        'Install the Claude skill so you can talk to Loupe in plain English? (recommended)',
       initial: true,
     },
   ]);
@@ -85,6 +129,18 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   console.log('  1. Open ' + kleur.cyan('loupe.example.tsx') + ' and copy the wiring into your app root.');
   console.log('  2. Wrap any animated scene in ' + kleur.cyan('<TimelineProvider>') + '.');
   console.log('  3. Run ' + kleur.cyan('npx loupe scan') + ' to see which animations are timeline-bound.');
+  console.log();
+  console.log(kleur.dim('Good to know'));
+  console.log(
+    kleur.dim('  • ') +
+      kleur.cyan('npx loupe check') +
+      kleur.dim('     see your installed version + check for updates'),
+  );
+  console.log(
+    kleur.dim('  • ') +
+      kleur.cyan('npx loupe uninstall') +
+      kleur.dim(' remove Loupe cleanly from this project'),
+  );
   console.log();
 }
 

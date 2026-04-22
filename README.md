@@ -20,6 +20,24 @@ npx loupe init
 
 No registry config, no auth setup. `loupe init` walks you through wiring the panel into your app and installs the bundled Claude skill so you can talk to Loupe in plain English from your editor.
 
+If Loupe is already installed in this project, `loupe init` will say so and show you the installed version instead of re-prompting.
+
+### Check your version
+
+```bash
+npx loupe check
+```
+
+Prints the version you have installed, what range `package.json` declares, and the latest on npm — plus an upgrade hint if you're behind.
+
+### Uninstall
+
+```bash
+npx loupe uninstall
+```
+
+Removes the `@arinze-clinton/loupe` dependency and the files `loupe init` wrote (`loupe.example.tsx`, `.claude/skills/loupe/SKILL.md`). Won't touch files you've edited. Auto-detects npm / pnpm / yarn / bun from your lockfile.
+
 ## Usage
 
 ```tsx

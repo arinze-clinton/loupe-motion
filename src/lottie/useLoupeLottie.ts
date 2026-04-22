@@ -1,7 +1,15 @@
 import { useEffect, useRef } from 'react';
 import { useMotionValueEvent } from 'framer-motion';
 import type { AnimationItem } from 'lottie-web';
-import { useTimeline } from '../runtime/TimelineProvider';
+// Self-import the main entry so this subpath shares the same
+// TimelineContext instance as `<TimelineProvider>`. If we import
+// from a relative path here, tsup bundles a SECOND copy of the
+// context into the lottie chunk and `useTimeline` can't see the
+// provider consumers mounted — which produces a white screen
+// ("useTimeline must be used inside <TimelineProvider>"). The
+// main package is externalized in tsup.config so the host resolves
+// this import to the already-loaded main bundle at runtime.
+import { useTimeline } from '@arinze-clinton/loupe';
 
 /**
  * Options for {@link useLoupeLottie}.

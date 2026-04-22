@@ -20,7 +20,19 @@ export default defineConfig([
     dts: true,
     sourcemap: true,
     clean: false,
-    external: ['react', 'react-dom', 'framer-motion', 'lottie-web'],
+    // `@arinze-clinton/loupe` is externalized so the self-import
+    // of `useTimeline` inside useLoupeLottie resolves at runtime
+    // to the already-loaded main bundle — sharing its
+    // TimelineContext. Without this the lottie subpath would
+    // bundle its own copy of the context and `useLoupeLottie()`
+    // wouldn't see `<TimelineProvider>` from the main export.
+    external: [
+      'react',
+      'react-dom',
+      'framer-motion',
+      'lottie-web',
+      '@arinze-clinton/loupe',
+    ],
     treeshake: true,
   },
   // CLI bundle — Node-only, no React
