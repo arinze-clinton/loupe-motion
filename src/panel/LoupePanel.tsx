@@ -867,7 +867,25 @@ function ScenePicker({ registry }: { registry: Registry }) {
                     flexShrink: 0,
                   }}
                 />
-                <span style={{ flex: 1 }}>{s.label}</span>
+                <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {s.label}
+                  {s.id === 'loupe-demo' && (
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: 0.5,
+                        padding: '1px 5px',
+                        borderRadius: 4,
+                        background: 'rgba(255,255,255,0.1)',
+                        color: 'rgba(255,255,255,0.55)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      Demo
+                    </span>
+                  )}
+                </span>
                 <span style={{ color: '#6B7280', fontWeight: 500, fontSize: 10 }}>{s.id}</span>
               </button>
             );

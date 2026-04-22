@@ -87,10 +87,22 @@ export function LoupeRegistryProvider({
   const [scenes, setScenes] = useState<RegisteredScene[]>([]);
   const [activeSceneId, setActiveSceneIdState] = useState<string | null>(null);
   const [flashTick, setFlashTick] = useState(0);
+  /**
+   * Once the user explicitly picks a scene via the panel dropdown,
+   * stop auto-switching on new registrations. Without this we'd
+   * yank the user's selection back to "whatever just registered"
+   * every time a scene re-registered (common with HMR / effect
+   * re-runs).
+   */
+  const userPickedRef = useRef(false);
 
   const sync = useCallback(() => {
     setScenes([...scenesRef.current]);
   }, []);
+
+  /** ID of the generated demo scene — the registry treats it as
+   *  secondary to any real scene. See `cli/auto-wire.ts`. */
+  const DEMO_SCENE_ID = 'loupe-demo';
 
   const registerScene = useCallback(
     (scene: RegisteredScene) => {
@@ -101,7 +113,18 @@ export function LoupeRegistryProvider({
         scenesRef.current.push(scene);
       }
       sync();
-      setActiveSceneIdState((current) => current ?? scene.id);
+      setActiveSceneIdState((current) => {
+        // User has already made an explicit pick — honor it.
+        if (userPickedRef.current) return current;
+        // Prefer any real scene over the demo. If the current active
+        // is the demo and a non-demo just registered, auto-switch.
+        const nonDemo = scenesRef.current.find(
+          (s) => s.id !== DEMO_SCENE_ID,
+        );
+        if (nonDemo) return nonDemo.id;
+        // Only demo around — keep current selection or fall back.
+        return current ?? scene.id;
+      });
     },
     [sync],
   );
@@ -130,6 +153,7 @@ export function LoupeRegistryProvider({
   );
 
   const setActiveSceneId = useCallback((id: string) => {
+    userPickedRef.current = true;
     setActiveSceneIdState(id);
     setFlashTick((t) => t + 1);
   }, []);

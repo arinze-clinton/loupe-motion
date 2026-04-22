@@ -15,7 +15,11 @@ import {
   warnOnInvokerMismatch,
   type Framework,
 } from '../util.js';
-import { autoWireNextjs, type AutoWireResult } from '../auto-wire.js';
+import {
+  autoWireNextjs,
+  upgradeDemoSceneIfGenerated,
+  type AutoWireResult,
+} from '../auto-wire.js';
 import {
   bridgeLocalTimelineProvider,
   findLocalTimelineProviders,
@@ -221,6 +225,23 @@ export async function init({ cwd }: InitOptions): Promise<void> {
         'Bridge scan failed: ' +
         (err instanceof Error ? err.message : String(err)),
     );
+  }
+
+  // 3c. Silently upgrade a pre-existing loupe-demo-scene.tsx so it
+  //     uses the latest template (v0.2.15: hides the dot unless
+  //     Demo is actively selected). User-edited files are detected
+  //     by the absence of our generation marker and left alone.
+  try {
+    const upgraded = await upgradeDemoSceneIfGenerated(cwd);
+    for (const rel of upgraded) {
+      console.log(
+        kleur.green('  ✓ ') +
+          rel +
+          kleur.dim('  (demo scene upgraded to latest template)'),
+      );
+    }
+  } catch {
+    /* best-effort — a bad demo-scene upgrade isn't worth blocking init */
   }
 
   const invocation = (cmd: string) => loupeInvocation(pm, cmd, 'local');

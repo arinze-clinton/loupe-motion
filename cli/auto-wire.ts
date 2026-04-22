@@ -117,6 +117,51 @@ export async function autoWireNextjs(cwd: string): Promise<AutoWireResult | null
  * Find the last top-level import statement and insert `line` on its
  * own line right after. Falls back to prepending if no imports exist.
  */
+/**
+ * If the host already has `loupe-demo-scene.tsx` from a prior init,
+ * silently upgrade it to the latest template — BUT only if we're
+ * confident we generated it in the first place. We detect Loupe-
+ * generated copies two ways:
+ *
+ *   1. The file contains the v2 marker (introduced in 0.2.15).
+ *   2. The file contains phrases unique to the 0.2.8–0.2.14 templates
+ *      ("Loupe demo scene — shows Loupe is working on first install.")
+ *      so first-time upgraders get picked up too.
+ *
+ * Any file that matches neither is assumed to be user-edited and
+ * left alone. Returns the relative path(s) we upgraded.
+ */
+export async function upgradeDemoSceneIfGenerated(
+  cwd: string,
+): Promise<string[]> {
+  const candidates = [
+    'app/loupe-demo-scene.tsx',
+    'src/app/loupe-demo-scene.tsx',
+  ];
+  const upgraded: string[] = [];
+  for (const rel of candidates) {
+    const abs = path.join(cwd, rel);
+    let src: string;
+    try {
+      src = await fs.readFile(abs, 'utf8');
+    } catch {
+      continue;
+    }
+    const isGenerated =
+      src.includes(LOUPE_DEMO_GENERATED_MARKER) ||
+      // Backwards-compat fingerprint from earlier templates (v0.2.8+).
+      src.includes('Loupe demo scene — shows Loupe is working on first install');
+    if (!isGenerated) continue;
+    // Already on the latest template — no-op.
+    if (src.includes(LOUPE_DEMO_GENERATED_MARKER) && src.includes('useOptionalLoupeRegistry')) {
+      continue;
+    }
+    await fs.writeFile(abs, NEXTJS_DEMO_SCENE_TEMPLATE, 'utf8');
+    upgraded.push(rel);
+  }
+  return upgraded;
+}
+
 function insertAfterLastImport(source: string, line: string): string {
   // Match a run of top-level imports at the start of lines.
   const importRegex = /^import\s[^\n]*;$/gm;
@@ -171,16 +216,30 @@ export function LoupeProvider({ children }: { children: React.ReactNode }) {
 }
 `;
 
+/** Marker embedded in the generated demo scene so `loupe init`
+ *  can detect it and silently upgrade it to the latest template
+ *  without overwriting files the user has edited. */
+export const LOUPE_DEMO_GENERATED_MARKER = 'LOUPE_GENERATED:demo-scene:v2';
+
 const NEXTJS_DEMO_SCENE_TEMPLATE = `'use client';
 
-// Loupe demo scene — shows Loupe is working on first install.
-// Replace with your real scenes, or delete this file and the
-// \`<LoupeDemoScene />\` line in \`loupe-provider.tsx\` when ready.
+// ${LOUPE_DEMO_GENERATED_MARKER}
 //
-// This scene has 4 phases — idle → enter → hold → exit. Scrub
-// the Loupe timeline to see the dot + color respond to time.
+// Loupe demo scene — shows you how Loupe works on first install.
+// The dot only appears while "Demo" is the active scene in the Loupe
+// panel; once your own scenes are registered, Loupe auto-switches
+// away from the demo and this file stays silent until you pick
+// "Demo" from the scene dropdown again.
+//
+// Delete this file + the \`<LoupeDemoScene />\` line in
+// \`loupe-provider.tsx\` when you're done learning — \`loupe uninstall\`
+// does that for you automatically.
 
-import { useTimelineValue, TimelineProvider } from '@arinze-clinton/loupe';
+import {
+  useTimelineValue,
+  TimelineProvider,
+  useOptionalLoupeRegistry,
+} from '@arinze-clinton/loupe';
 
 const DEMO_CONFIG = {
   id: 'loupe-demo',
@@ -198,6 +257,8 @@ export function LoupeDemoScene() {
 }
 
 function DemoDot() {
+  // Hooks run unconditionally — then we decide whether to paint.
+  const registry = useOptionalLoupeRegistry();
   const x = useTimelineValue(-120, 120, { phase: 'enter' });
   const xHold = useTimelineValue(120, 120, { phase: 'hold' });
   const xExit = useTimelineValue(120, 240, { phase: 'exit' });
@@ -205,25 +266,55 @@ function DemoDot() {
   const opacityExit = useTimelineValue(1, 0, { phase: 'exit' });
   const hue = useTimelineValue(210, 340, { phase: 'hold' });
 
+  // Only render the visible dot when the Loupe panel is actively
+  // showing the demo scene. If the user has other scenes, Loupe
+  // auto-switches away and this component stays invisible — no more
+  // dot in the corner while you're working on real things.
+  const isActive = registry?.activeSceneId === 'loupe-demo';
+  if (!isActive) return null;
+
   return (
     <div
       aria-hidden
       style={{
         position: 'fixed',
         bottom: 24,
-        left: 80,
-        width: 40,
-        height: 40,
-        borderRadius: 999,
-        background: \`hsl(\${hue}, 85%, 58%)\`,
-        transform: \`translateX(\${x.get() + xHold.get() - 120 + xExit.get() - 120}px)\`,
-        opacity: opacity.get() * opacityExit.get(),
+        left: 24,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
         pointerEvents: 'none',
         zIndex: 9999,
-        transition: 'background 120ms linear',
-        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
       }}
-    />
+    >
+      <span
+        style={{
+          fontFamily: 'ui-sans-serif, system-ui, sans-serif',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: 0.8,
+          padding: '4px 8px',
+          borderRadius: 999,
+          background: 'rgba(17, 24, 39, 0.85)',
+          color: 'white',
+          textTransform: 'uppercase',
+        }}
+      >
+        Loupe Demo
+      </span>
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 999,
+          background: \`hsl(\${hue.get()}, 85%, 58%)\`,
+          transform: \`translateX(\${x.get() + xHold.get() - 120 + xExit.get() - 120}px)\`,
+          opacity: opacity.get() * opacityExit.get(),
+          transition: 'background 120ms linear',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+        }}
+      />
+    </div>
   );
 }
 `;
