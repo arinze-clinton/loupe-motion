@@ -9,6 +9,7 @@ import {
   detectPackageManager,
   warnOnInvokerMismatch,
 } from '../util.js';
+import { findBridgeReverts } from '../bridge.js';
 
 /**
  * `loupe uninstall` — clean exit ramp.
@@ -67,6 +68,10 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
   // `loupe-provider.tsx` sibling goes with it.
   const autoWireReverts = await findAutoWireReverts(cwd);
 
+  // Also find any local TimelineProvider files init bridged — those
+  // have their own `.loupe-backup` we'll restore byte-for-byte.
+  const bridgeReverts = await findBridgeReverts(cwd);
+
   console.log('  The following will be removed:');
   if (info.declared) {
     console.log(
@@ -88,6 +93,12 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
     console.log(
       `    • restore ${kleur.cyan(r.entryFile)} ` +
         kleur.dim(`from ${r.backupFile}`),
+    );
+  }
+  for (const r of bridgeReverts) {
+    console.log(
+      `    • restore ${kleur.cyan(path.relative(cwd, r.file))} ` +
+        kleur.dim(`(local timeline bridge — from ${path.relative(cwd, r.backupFile)})`),
     );
   }
   const emptyDirs = [
@@ -164,7 +175,25 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
     }
   }
 
-  // 4. Prune empty Loupe parent dirs so the tree isn't littered.
+  // 4. Revert any bridged local TimelineProvider files.
+  for (const r of bridgeReverts) {
+    try {
+      const backup = await fs.readFile(r.backupFile, 'utf8');
+      await fs.writeFile(r.file, backup, 'utf8');
+      await fs.rm(r.backupFile, { force: true });
+      console.log(
+        kleur.green('  ✓ restored ') + path.relative(cwd, r.file),
+      );
+    } catch (err) {
+      console.log(
+        kleur.yellow('  ! ') +
+          `Could not restore ${path.relative(cwd, r.file)}: ` +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+  }
+
+  // 5. Prune empty Loupe parent dirs so the tree isn't littered.
   await pruneEmptyDir(path.join(cwd, '.claude', 'skills', 'loupe'));
 
   console.log();

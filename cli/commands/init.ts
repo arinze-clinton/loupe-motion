@@ -16,6 +16,11 @@ import {
   type Framework,
 } from '../util.js';
 import { autoWireNextjs, type AutoWireResult } from '../auto-wire.js';
+import {
+  bridgeLocalTimelineProvider,
+  findLocalTimelineProviders,
+  type BridgeOutcome,
+} from '../bridge.js';
 
 // tsup ships this file as ESM; `__dirname` isn't defined there.
 // Recompute from `import.meta.url` so the skill-file lookup works.
@@ -182,6 +187,40 @@ export async function init({ cwd }: InitOptions): Promise<void> {
           '. Falling back to manual. See Next steps below.',
       );
     }
+  }
+
+  // 3b. Silently bridge any local TimelineProvider copies so their
+  //     scenes show up in the Loupe panel's dropdown. No prompt —
+  //     user-facing UX just says "your existing scenes are now
+  //     visible". Uninstall reverts via the `.loupe-backup` the
+  //     patcher writes.
+  try {
+    const candidates = await findLocalTimelineProviders(cwd);
+    for (const abs of candidates) {
+      const outcome: BridgeOutcome = await bridgeLocalTimelineProvider(abs);
+      const rel = path.relative(cwd, abs);
+      if (outcome.kind === 'patched') {
+        console.log(
+          kleur.green('  ✓ ') +
+            rel +
+            kleur.dim(`  (bridged → scenes will appear in Loupe's dropdown)`),
+        );
+      } else if (outcome.kind === 'already-bridged') {
+        // Quiet — nothing to report.
+      } else if (outcome.kind === 'unsupported-shape') {
+        console.log(
+          kleur.yellow('  ! ') +
+            rel +
+            kleur.dim(`  (skipped bridge: ${outcome.reason})`),
+        );
+      }
+    }
+  } catch (err) {
+    console.log(
+      kleur.yellow('  ! ') +
+        'Bridge scan failed: ' +
+        (err instanceof Error ? err.message : String(err)),
+    );
   }
 
   const invocation = (cmd: string) => loupeInvocation(pm, cmd, 'local');
