@@ -23,7 +23,9 @@ export {
   LoupeRegistryProvider,
   useLoupeRegistry,
   useOptionalLoupeRegistry,
+  useRegisterSceneWithLoupe,
   useSceneRootRef,
+  type ExternalScene,
   type RegisteredScene,
   type RegisteredTimeline,
 } from './runtime/registry';

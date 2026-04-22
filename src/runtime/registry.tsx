@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -39,6 +40,29 @@ export type RegisteredScene = {
   rootRef: React.RefObject<HTMLElement | null>;
   timeline: RegisteredTimeline;
   annotations?: RegisteredAnnotations;
+};
+
+/**
+ * Shape callers pass to `useRegisterSceneWithLoupe`. Matches what
+ * a TimelineProvider-style component already computes — a MotionValue
+ * + scene config + controls. Keep this decoupled from our internal
+ * `TimelineState` so third-party timelines don't need to mirror our
+ * exact types.
+ */
+export type ExternalScene = {
+  id: string;
+  label: string;
+  phaseOrder: readonly string[];
+  phaseLabels?: Readonly<Record<string, string>>;
+  ranges: PhaseRange[];
+  totalDuration: number;
+  time: MotionValue<number>;
+  speed: number;
+  setSpeed: (s: number) => void;
+  paused: boolean;
+  setPaused: (p: boolean) => void;
+  seek: (ms: number) => void;
+  restart: () => void;
 };
 
 type LoupeRegistryState = {
@@ -154,6 +178,71 @@ export function useLoupeRegistry(): LoupeRegistryState {
 
 export function useOptionalLoupeRegistry(): LoupeRegistryState | null {
   return useContext(LoupeRegistryContext);
+}
+
+/**
+ * Register a scene with the Loupe panel's registry from outside
+ * Loupe's built-in `<TimelineProvider>`. Useful when you've got
+ * your OWN TimelineProvider implementation (e.g. a local copy of
+ * the timeline primitives) and just want its state to show up in
+ * the Loupe panel's scene dropdown.
+ *
+ * Call this inside your provider with the scene's timeline state
+ * + the root-element ref you want the panel to flash / scroll to.
+ * No-op if no `<LoupeRegistryProvider>` is mounted above — safe to
+ * leave in place even when Loupe isn't active.
+ *
+ * @example
+ * ```tsx
+ * function MyTimelineProvider({ config, children }) {
+ *   const time = motionValue(0);
+ *   // ...all the usual state...
+ *   const value = { id: config.id, label: config.label, time, ... };
+ *   const rootRef = useRef<HTMLDivElement | null>(null);
+ *   useRegisterSceneWithLoupe(value, rootRef);
+ *   return <div ref={rootRef}>{children}</div>;
+ * }
+ * ```
+ */
+export function useRegisterSceneWithLoupe(
+  scene: ExternalScene,
+  rootRef: React.RefObject<HTMLElement | null>,
+): void {
+  const registry = useOptionalLoupeRegistry();
+  useEffect(() => {
+    if (!registry) return;
+    registry.registerScene({
+      id: scene.id,
+      label: scene.label,
+      rootRef,
+      timeline: {
+        time: scene.time,
+        ranges: scene.ranges,
+        totalDuration: scene.totalDuration,
+        phaseOrder: scene.phaseOrder,
+        phaseLabels: scene.phaseLabels,
+        speed: scene.speed,
+        setSpeed: scene.setSpeed,
+        paused: scene.paused,
+        setPaused: scene.setPaused,
+        seek: scene.seek,
+        restart: scene.restart,
+      },
+    });
+    return () => registry.unregisterScene(scene.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    scene.id,
+    scene.label,
+    scene.phaseOrder,
+    scene.phaseLabels,
+    scene.ranges,
+    scene.totalDuration,
+    scene.paused,
+    scene.speed,
+    rootRef,
+    registry,
+  ]);
 }
 
 const SceneRootRefContext = createContext<React.RefObject<HTMLElement | null> | null>(
