@@ -209,9 +209,18 @@ export function useRegisterSceneWithLoupe(
   rootRef: React.RefObject<HTMLElement | null>,
 ): void {
   const registry = useOptionalLoupeRegistry();
+  // Pull the stable useCallback refs off the registry BEFORE using
+  // them as deps. Depending on the whole `registry` object would
+  // retrigger the effect on every scene registration (registry.value
+  // re-memoizes when scenes changes), which re-registers, which
+  // re-memoizes, which re-registers — infinite loop. The callback
+  // references are stable, so deps on them are safe.
+  const registerScene = registry?.registerScene;
+  const unregisterScene = registry?.unregisterScene;
+
   useEffect(() => {
-    if (!registry) return;
-    registry.registerScene({
+    if (!registerScene || !unregisterScene) return;
+    registerScene({
       id: scene.id,
       label: scene.label,
       rootRef,
@@ -229,7 +238,7 @@ export function useRegisterSceneWithLoupe(
         restart: scene.restart,
       },
     });
-    return () => registry.unregisterScene(scene.id);
+    return () => unregisterScene(scene.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scene.id,
@@ -241,7 +250,8 @@ export function useRegisterSceneWithLoupe(
     scene.paused,
     scene.speed,
     rootRef,
-    registry,
+    registerScene,
+    unregisterScene,
   ]);
 }
 

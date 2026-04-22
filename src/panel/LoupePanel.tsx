@@ -892,9 +892,27 @@ function SceneFlashOverlay({ registry }: { registry: Registry }) {
       setRect(null);
       return;
     }
-    setRect(el.getBoundingClientRect());
-    const t = window.setTimeout(() => setRect(null), 750);
-    return () => window.clearTimeout(t);
+    // Scroll the scene into view first so the flash and the
+    // animation itself are actually visible. `block: 'center'`
+    // frames the scene rather than jamming its top against the
+    // viewport. Then wait a beat for the scroll to settle before
+    // measuring its final rect for the flash overlay — otherwise
+    // the flash is drawn at the pre-scroll position.
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch {
+      el.scrollIntoView();
+    }
+    // Give the smooth scroll ~400ms to land, then capture the rect.
+    // The flash itself runs ~700ms after that.
+    const measure = window.setTimeout(() => {
+      setRect(el.getBoundingClientRect());
+    }, 400);
+    const clear = window.setTimeout(() => setRect(null), 400 + 750);
+    return () => {
+      window.clearTimeout(measure);
+      window.clearTimeout(clear);
+    };
   }, [registry.flashTick, registry.activeSceneId, registry.scenes]);
 
   if (!rect) return null;
