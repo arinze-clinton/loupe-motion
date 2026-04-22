@@ -14,6 +14,7 @@ import {
   warnOnInvokerMismatch,
   type Framework,
 } from '../util.js';
+import { autoWireNextjs, type AutoWireResult } from '../auto-wire.js';
 
 // tsup ships this file as ESM; `__dirname` isn't defined there.
 // Recompute from `import.meta.url` so the skill-file lookup works.
@@ -81,6 +82,11 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     console.log();
   }
 
+  // Detect framework up-front so we can offer auto-wire only when
+  // we know how to do it safely for the detected stack.
+  const framework = await detectFramework(cwd);
+  const canAutoWire = framework === 'nextjs';
+
   const answers = await prompts([
     {
       type: 'select',
@@ -100,6 +106,15 @@ export async function init({ cwd }: InitOptions): Promise<void> {
       ],
       initial: 0,
     },
+    canAutoWire
+      ? {
+        type: 'confirm',
+        name: 'autoWire',
+        message:
+          'Auto-wire Loupe into app/layout.tsx for you? (recommended — creates loupe-provider.tsx + backs up the original)',
+        initial: true,
+      }
+      : { type: null as unknown as 'confirm', name: 'autoWire' }, // skip the prompt
     {
       type: 'confirm',
       name: 'installSkill',
@@ -116,7 +131,7 @@ export async function init({ cwd }: InitOptions): Promise<void> {
 
   // 1. Sample wiring file — framework-aware so the example matches
   //    the imports / entry-file shape of the user's stack.
-  const framework = await detectFramework(cwd);
+  //    (Framework was detected above, before the prompts.)
   const sampleFile = path.join(cwd, 'loupe.example.tsx');
   await writeIfMissing(sampleFile, sampleWiring(answers.mount, framework));
   console.log(kleur.green('  ✓ ') + path.relative(cwd, sampleFile));
@@ -141,6 +156,32 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     }
   }
 
+  // 3. Auto-wire the entry file when the user opted in (Next.js only
+  //    for now). Any non-success path falls through to the paste-it-
+  //    yourself flow below.
+  let wire: AutoWireResult | null = null;
+  if (answers.autoWire && canAutoWire) {
+    try {
+      wire = await autoWireNextjs(cwd);
+      if (wire) {
+        console.log(kleur.green('  ✓ ') + wire.providerFile);
+        console.log(kleur.green('  ✓ ') + `${wire.entryFile} (backup → ${wire.backupFile})`);
+      } else {
+        console.log(
+          kleur.yellow('  ! ') +
+            "Couldn't auto-wire — your layout file doesn't match the expected shape. See Next steps below.",
+        );
+      }
+    } catch (err) {
+      console.log(
+        kleur.yellow('  ! ') +
+          'Auto-wire failed: ' +
+          (err instanceof Error ? err.message : String(err)) +
+          '. Falling back to manual. See Next steps below.',
+      );
+    }
+  }
+
   const invocation = (cmd: string) => loupeInvocation(pm, cmd, 'local');
   const entryFile = entryFileFor(framework);
   const running = await detectRunningDevServer(framework);
@@ -148,6 +189,55 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   console.log();
   console.log(kleur.bold('Next steps'));
   console.log();
+
+  if (wire) {
+    // AUTO-WIRED PATH — no manual paste step, just pick a scene and go.
+    console.log(
+      '  ' +
+        kleur.bold('1.') +
+        ' Pick ONE animation in your app and wrap it in ' +
+        kleur.cyan('<TimelineProvider>') +
+        '.',
+    );
+    console.log(
+      '     See ' +
+        kleur.cyan('loupe.example.tsx') +
+        ' for the exact syntax.',
+    );
+    console.log();
+    if (running) {
+      console.log(
+        '  ' +
+          kleur.bold('2.') +
+          ' Your dev server is already running at ' +
+          kleur.cyan(running.url) +
+          '.',
+      );
+      console.log(
+        '     Save the file → page refreshes → floating ' +
+          kleur.cyan('Loupe') +
+          ' panel appears in the corner.',
+      );
+    } else {
+      console.log(
+        '  ' +
+          kleur.bold('2.') +
+          ' Start your dev server with ' +
+          kleur.cyan(devCommand(pm)) +
+          '.',
+      );
+      console.log(
+        '     Open the URL it prints — floating ' +
+          kleur.cyan('Loupe') +
+          ' panel appears in the corner.',
+      );
+    }
+    console.log();
+    printGoodToKnow(invocation);
+    return;
+  }
+
+  // MANUAL PATH — user declined auto-wire, wasn't offered, or it bailed.
   console.log(
     '  ' +
       kleur.bold('1.') +
@@ -223,6 +313,10 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     );
   }
   console.log();
+  printGoodToKnow(invocation);
+}
+
+function printGoodToKnow(invocation: (cmd: string) => string): void {
   console.log(
     kleur.dim('  Need the full walkthrough? ') +
       kleur.cyan('https://github.com/arinze-clinton/loupe-motion'),

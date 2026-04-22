@@ -62,6 +62,11 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
     }
   }
 
+  // Find any auto-wire artifacts: `<file>.loupe-backup` means init
+  // edited the host's layout; we'll restore from it. The matching
+  // `loupe-provider.tsx` sibling goes with it.
+  const autoWireReverts = await findAutoWireReverts(cwd);
+
   console.log('  The following will be removed:');
   if (info.declared) {
     console.log(
@@ -71,6 +76,16 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
   }
   for (const rel of removableFiles) {
     console.log(`    • ${kleur.cyan(rel)}`);
+  }
+  for (const r of autoWireReverts) {
+    console.log(
+      `    • ${kleur.cyan(r.providerFile)} ` +
+        kleur.dim('(provider file created by init)'),
+    );
+    console.log(
+      `    • restore ${kleur.cyan(r.entryFile)} ` +
+        kleur.dim(`from ${r.backupFile}`),
+    );
   }
   const emptyDirs = [
     '.claude/skills/loupe',
@@ -114,7 +129,32 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
     console.log(kleur.green('  ✓ removed ') + rel);
   }
 
-  // 3. Prune empty Loupe parent dirs so the tree isn't littered.
+  // 3. Revert auto-wired layouts: restore backup → remove provider.
+  for (const r of autoWireReverts) {
+    const entryAbs = path.join(cwd, r.entryFile);
+    const backupAbs = path.join(cwd, r.backupFile);
+    const providerAbs = path.join(cwd, r.providerFile);
+    try {
+      const backup = await fs.readFile(backupAbs, 'utf8');
+      await fs.writeFile(entryAbs, backup, 'utf8');
+      await fs.rm(backupAbs, { force: true });
+      console.log(kleur.green('  ✓ restored ') + r.entryFile);
+    } catch (err) {
+      console.log(
+        kleur.yellow('  ! ') +
+          `Could not restore ${r.entryFile}: ` +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+    try {
+      await fs.rm(providerAbs, { force: true });
+      console.log(kleur.green('  ✓ removed ') + r.providerFile);
+    } catch {
+      /* already gone — ignore */
+    }
+  }
+
+  // 4. Prune empty Loupe parent dirs so the tree isn't littered.
   await pruneEmptyDir(path.join(cwd, '.claude', 'skills', 'loupe'));
 
   console.log();
@@ -135,6 +175,43 @@ function uninstallArgsFor(pm: 'npm' | 'yarn' | 'pnpm' | 'bun'): string[] {
     default:
       return ['uninstall', '@arinze-clinton/loupe'];
   }
+}
+
+/**
+ * Walk known Next.js App Router layout locations, looking for
+ * `<layout>.loupe-backup` files. Each one means init auto-wired the
+ * host's layout; we revert it by restoring the backup and removing
+ * the matching `loupe-provider.tsx` sibling.
+ */
+async function findAutoWireReverts(cwd: string): Promise<
+  Array<{ entryFile: string; backupFile: string; providerFile: string }>
+> {
+  const candidates = [
+    'app/layout.tsx',
+    'src/app/layout.tsx',
+    'app/layout.jsx',
+    'src/app/layout.jsx',
+  ];
+  const results: Array<{
+    entryFile: string;
+    backupFile: string;
+    providerFile: string;
+  }> = [];
+  for (const entry of candidates) {
+    const backup = `${entry}.loupe-backup`;
+    try {
+      await fs.access(path.join(cwd, backup));
+    } catch {
+      continue;
+    }
+    const provider = path.join(path.dirname(entry), 'loupe-provider.tsx');
+    results.push({
+      entryFile: entry,
+      backupFile: backup,
+      providerFile: provider,
+    });
+  }
+  return results;
 }
 
 async function pruneEmptyDir(dir: string): Promise<void> {
