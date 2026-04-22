@@ -80,6 +80,25 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     );
     console.log();
 
+    // Even when we're short-circuiting, silently upgrade any Loupe-
+    // generated demo-scene file so users pick up quality-of-life
+    // improvements without having to opt into the full re-prompt
+    // flow. Only touches files carrying our generation marker —
+    // user-edited files are left alone.
+    try {
+      const upgraded = await upgradeDemoSceneIfGenerated(cwd);
+      for (const rel of upgraded) {
+        console.log(
+          kleur.green('  ✓ ') +
+            rel +
+            kleur.dim('  (demo scene upgraded to latest template)'),
+        );
+      }
+      if (upgraded.length > 0) console.log();
+    } catch {
+      /* non-blocking */
+    }
+
     // Still offer to (re)write the sample wiring / skill for users
     // who want to regenerate them — but only after explicit confirm.
     const { proceed } = await prompts({
