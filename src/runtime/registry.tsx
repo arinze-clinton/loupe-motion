@@ -68,7 +68,13 @@ export type ExternalScene = {
 type LoupeRegistryState = {
   scenes: RegisteredScene[];
   activeSceneId: string | null;
-  setActiveSceneId: (id: string) => void;
+  /**
+   * Set the active scene by id, or pass `null` to clear selection
+   * (collapses the floating panel to a draggable pill). Marks the
+   * user's choice as sticky so later registrations don't auto-swap
+   * it back.
+   */
+  setActiveSceneId: (id: string | null) => void;
   registerScene: (scene: RegisteredScene) => void;
   unregisterScene: (id: string) => void;
   attachAnnotations: (sceneId: string, ann: RegisteredAnnotations) => void;
@@ -152,10 +158,13 @@ export function LoupeRegistryProvider({
     [sync],
   );
 
-  const setActiveSceneId = useCallback((id: string) => {
+  const setActiveSceneId = useCallback((id: string | null) => {
     userPickedRef.current = true;
     setActiveSceneIdState(id);
-    setFlashTick((t) => t + 1);
+    // Only flash when selecting a real scene — collapsing to "None"
+    // doesn't need a flash since there's nothing to highlight on the
+    // page.
+    if (id) setFlashTick((t) => t + 1);
   }, []);
 
   const flash = useCallback((id: string) => {

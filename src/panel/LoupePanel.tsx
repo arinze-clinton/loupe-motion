@@ -30,6 +30,11 @@ import { annotationsToMarkdown } from '../annotations/export';
 
 const SPEED_OPTIONS = [0.25, 0.5, 1, 2, 4] as const;
 const LOUPE_POSITION_KEY = 'loupe:panelPosition';
+/** Stores the user's explicit scene pick — including `null` when
+ *  they collapsed the panel. Loaded on mount so refresh doesn't
+ *  un-collapse the panel by auto-selecting whatever scene registers
+ *  first. */
+const LOUPE_ACTIVE_SCENE_KEY = 'loupe:activeScene';
 
 const FONT = 'var(--loupe-font, system-ui, -apple-system, sans-serif)';
 const ACCENT = 'var(--loupe-accent, #3A97F9)';
@@ -49,6 +54,72 @@ export function LoupePanel() {
   const activeScene = registry.activeSceneId
     ? registry.scenes.find((s) => s.id === registry.activeSceneId)
     : undefined;
+
+  // Hydrate the persisted scene selection once — BEFORE any auto-
+  // select from scene registration has time to override it. Writing
+  // `null` explicitly means "user picked None, stay collapsed".
+  const sceneHydratedRef = useRef(false);
+  useEffect(() => {
+    if (sceneHydratedRef.current) return;
+    sceneHydratedRef.current = true;
+    try {
+      const raw = localStorage.getItem(LOUPE_ACTIVE_SCENE_KEY);
+      if (raw === null) return;
+      const parsed = JSON.parse(raw) as { id: string | null };
+      // null = deliberate collapsed state; a real id = restore it
+      // if the scene is (or becomes) registered.
+      if (parsed.id === null) {
+        registry.setActiveSceneId(null);
+      } else if (registry.scenes.some((s) => s.id === parsed.id)) {
+        registry.setActiveSceneId(parsed.id);
+      }
+    } catch {
+      /* corrupt storage — ignore */
+    }
+  }, [registry]);
+
+  // Persist every explicit change so refreshes preserve it.
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        LOUPE_ACTIVE_SCENE_KEY,
+        JSON.stringify({ id: registry.activeSceneId }),
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [registry.activeSceneId]);
+
+  // Escape toggles the panel between collapsed (no scene) and the
+  // last-selected real scene. Fast way to get the panel out of the
+  // way mid-edit without reaching for the dropdown.
+  const lastRealSceneIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (registry.activeSceneId) {
+      lastRealSceneIdRef.current = registry.activeSceneId;
+    }
+  }, [registry.activeSceneId]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      // Only react when Loupe-relevant — skip when the user is
+      // typing in an input, contenteditable, etc.
+      const target = e.target as HTMLElement | null;
+      if (target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      )) return;
+      if (registry.activeSceneId) {
+        registry.setActiveSceneId(null);
+      } else if (lastRealSceneIdRef.current &&
+                 registry.scenes.some((s) => s.id === lastRealSceneIdRef.current)) {
+        registry.setActiveSceneId(lastRealSceneIdRef.current);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [registry]);
 
   const {
     pickerMode,
@@ -171,28 +242,48 @@ export function LoupePanel() {
   };
 
   if (!activeScene) {
-    return (
-      <motion.div
-        data-loupe-ui
-        className="pointer-events-none fixed left-1/2 -translate-x-1/2"
-        style={{ bottom: 16, zIndex: 10050, position: 'fixed', left: '50%', transform: 'translateX(-50%)' }}
-      >
-        <div
-          style={{
-            pointerEvents: 'auto',
-            padding: '8px 14px',
-            background: PANEL_BG,
-            borderRadius: 999,
-            color: PANEL_MUTED,
-            fontFamily: FONT,
-            fontSize: 11,
-            fontWeight: 600,
-            border: `1px solid ${PANEL_BORDER}`,
-          }}
+    // Two sub-states:
+    //  - No scenes registered at all → static centered "no scene" pill
+    //    (Loupe hasn't found anything to drive yet).
+    //  - Scenes registered but user picked "None" → collapsed
+    //    draggable pill with JUST the scene picker, so they can
+    //    re-select any time. Shares the drag position with the
+    //    full panel so collapsing/expanding doesn't jump around.
+    if (registry.scenes.length === 0) {
+      return (
+        <motion.div
+          data-loupe-ui
+          className="pointer-events-none fixed left-1/2 -translate-x-1/2"
+          style={{ bottom: 16, zIndex: 10050, position: 'fixed', left: '50%', transform: 'translateX(-50%)' }}
         >
-          Loupe — no scene registered
-        </div>
-      </motion.div>
+          <div
+            style={{
+              pointerEvents: 'auto',
+              padding: '8px 14px',
+              background: PANEL_BG,
+              borderRadius: 999,
+              color: PANEL_MUTED,
+              fontFamily: FONT,
+              fontSize: 11,
+              fontWeight: 600,
+              border: `1px solid ${PANEL_BORDER}`,
+            }}
+          >
+            Loupe — no scene registered
+          </div>
+        </motion.div>
+      );
+    }
+    return (
+      <CollapsedPanel
+        registry={registry}
+        dragControls={dragControls}
+        x={x}
+        y={y}
+        panelRef={panelRef}
+        setPanelSize={setPanelSize}
+        persistPosition={persistPosition}
+      />
     );
   }
 
@@ -220,6 +311,116 @@ export function LoupePanel() {
 
 type Registry = ReturnType<typeof useLoupeRegistry>;
 type ActiveScene = NonNullable<ReturnType<Registry['scenes']['find']>>;
+
+/**
+ * Compact, draggable pill shown when the user picks "None" from the
+ * scene dropdown. Contains only the scene picker so they can re-
+ * select a scene whenever they want. Shares the drag position
+ * (x/y MotionValues) with the full panel so collapsing/expanding
+ * doesn't jump the panel across the screen.
+ */
+function CollapsedPanel({
+  registry,
+  dragControls,
+  x,
+  y,
+  panelRef,
+  setPanelSize,
+  persistPosition,
+}: {
+  registry: Registry;
+  dragControls: ReturnType<typeof useDragControls>;
+  x: ReturnType<typeof useMotionValue<number>>;
+  y: ReturnType<typeof useMotionValue<number>>;
+  panelRef: React.MutableRefObject<HTMLDivElement | null>;
+  setPanelSize: (size: { w: number; h: number }) => void;
+  persistPosition: () => void;
+}) {
+  // Track the collapsed pill's size so constraints stay honest if
+  // user drags to viewport edges.
+  useLayoutEffect(() => {
+    const el = panelRef.current;
+    if (!el) return;
+    const update = () => {
+      setPanelSize({ w: el.offsetWidth, h: el.offsetHeight });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [panelRef, setPanelSize]);
+
+  return (
+    <motion.div
+      data-loupe-ui
+      className="pointer-events-none fixed"
+      style={{
+        bottom: 16,
+        left: '50%',
+        zIndex: 10050,
+        translateX: '-50%',
+      }}
+    >
+      <motion.div
+        ref={panelRef}
+        drag
+        dragListener={false}
+        dragControls={dragControls}
+        dragMomentum={false}
+        onDragEnd={persistPosition}
+        transition={{ duration: 0.35, ease: [0.59, 0.01, 0.4, 0.98] }}
+        style={{
+          pointerEvents: 'auto',
+          x,
+          y,
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '6px 8px 6px 10px',
+          background: PANEL_BG,
+          border: `1px solid ${PANEL_BORDER}`,
+          borderRadius: 999,
+          color: PANEL_FG,
+          fontFamily: FONT,
+          boxShadow:
+            '0 12px 28px rgba(0, 0, 0, 0.30), 0 3px 10px rgba(0, 0, 0, 0.20)',
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+        }}
+      >
+        {/* Drag handle — grabs the whole pill */}
+        <button
+          type="button"
+          aria-label="Drag Loupe"
+          onPointerDown={(e) => dragControls.start(e)}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 22,
+            height: 22,
+            border: 'none',
+            borderRadius: 999,
+            background: 'transparent',
+            color: PANEL_MUTED,
+            cursor: 'grab',
+            padding: 0,
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+            <circle cx="3" cy="3" r="1.1" />
+            <circle cx="3" cy="6" r="1.1" />
+            <circle cx="3" cy="9" r="1.1" />
+            <circle cx="9" cy="3" r="1.1" />
+            <circle cx="9" cy="6" r="1.1" />
+            <circle cx="9" cy="9" r="1.1" />
+          </svg>
+        </button>
+        <ScenePicker registry={registry} />
+      </motion.div>
+    </motion.div>
+  );
+}
 
 function ActiveScenePanel({
   registry,
@@ -789,7 +990,7 @@ function ScenePicker({ registry }: { registry: Registry }) {
         }}
         title="Pick which animation Loupe is controlling"
       >
-        <span>{active?.label ?? '—'}</span>
+        <span>{active?.label ?? '— Pick a scene'}</span>
         <svg width="9" height="9" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 5l4 4 4-4" />
         </svg>
@@ -822,6 +1023,70 @@ function ScenePicker({ registry }: { registry: Registry }) {
             <div style={{ padding: '8px 10px', color: '#6B7280', fontSize: 11 }}>
               No scenes registered
             </div>
+          )}
+          {registry.scenes.length > 0 && (
+            <>
+              {/* "None" option — collapses Loupe to a draggable
+                  pill so it's out of the way without being fully
+                  dismissed. */}
+              <button
+                type="button"
+                onClick={() => {
+                  registry.setActiveSceneId(null);
+                  setOpen(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  width: '100%',
+                  padding: '7px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background:
+                    registry.activeSceneId === null
+                      ? 'rgba(58,151,249,0.18)'
+                      : 'transparent',
+                  color:
+                    registry.activeSceneId === null ? PANEL_HIGHLIGHT : PANEL_MUTED,
+                  fontFamily: 'inherit',
+                  fontWeight: 600,
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  gap: 8,
+                  fontStyle: 'italic',
+                }}
+                onMouseEnter={(e) => {
+                  if (registry.activeSceneId !== null)
+                    (e.currentTarget as HTMLElement).style.background =
+                      'rgba(255,255,255,0.06)';
+                }}
+                onMouseLeave={(e) => {
+                  if (registry.activeSceneId !== null)
+                    (e.currentTarget as HTMLElement).style.background = 'transparent';
+                }}
+              >
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.12)',
+                    border: '1px dashed rgba(255,255,255,0.3)',
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ flex: 1 }}>— None (collapse panel)</span>
+              </button>
+              <div
+                aria-hidden
+                style={{
+                  height: 1,
+                  background: 'rgba(255,255,255,0.08)',
+                  margin: '4px 6px',
+                }}
+              />
+            </>
           )}
           {registry.scenes.map((s) => {
             const isActive = s.id === registry.activeSceneId;
