@@ -283,6 +283,7 @@ export function LoupePanel() {
         panelRef={panelRef}
         setPanelSize={setPanelSize}
         persistPosition={persistPosition}
+        dragConstraints={constraints}
       />
     );
   }
@@ -327,6 +328,7 @@ function CollapsedPanel({
   panelRef,
   setPanelSize,
   persistPosition,
+  dragConstraints,
 }: {
   registry: Registry;
   dragControls: ReturnType<typeof useDragControls>;
@@ -335,6 +337,7 @@ function CollapsedPanel({
   panelRef: React.MutableRefObject<HTMLDivElement | null>;
   setPanelSize: (size: { w: number; h: number }) => void;
   persistPosition: () => void;
+  dragConstraints: { left: number; right: number; top: number; bottom: number };
 }) {
   // Track the collapsed pill's size so constraints stay honest if
   // user drags to viewport edges.
@@ -367,6 +370,8 @@ function CollapsedPanel({
         dragListener={false}
         dragControls={dragControls}
         dragMomentum={false}
+        dragElastic={0}
+        dragConstraints={dragConstraints}
         onDragEnd={persistPosition}
         transition={{ duration: 0.35, ease: [0.59, 0.01, 0.4, 0.98] }}
         style={{
