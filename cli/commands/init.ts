@@ -193,59 +193,29 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   console.log();
 
   if (wire) {
-    // AUTO-WIRED PATH — nothing for the user to do.
+    // AUTO-WIRED PATH — no next-steps, no good-to-know, no extra
+    // links. Install should feel "done" the moment prompts finish.
+    console.log();
     if (running) {
-      console.log(kleur.bold().green('  ✓ All set.'));
-      console.log();
-      console.log(
-        '  Your dev server at ' +
-          kleur.cyan(running.url) +
-          ' will auto-reload. A moving dot will appear in the',
-      );
-      console.log(
-        '  bottom-left of your page — that\'s the Loupe demo scene. The floating ' +
-          kleur.cyan('Loupe') +
-          ' panel shows',
-      );
-      console.log('  up in the corner; click the scene dropdown and scrub.');
-      console.log();
-
-      // Try to open the browser. If it works, tell the user so they
-      // know what just happened; if not, print the URL instead.
       const opened = await openInBrowser(running.url);
+      console.log(
+        kleur.bold().green('✓ All set. ') +
+          'Refresh ' +
+          kleur.cyan(running.url) +
+          ' — the Loupe timeline panel appears at the bottom.',
+      );
       if (opened) {
-        console.log(
-          kleur.dim('  Opened ') + kleur.cyan(running.url) + kleur.dim(' in your browser.'),
-        );
-      } else {
-        console.log(
-          kleur.dim('  Open ') + kleur.cyan(running.url) + kleur.dim(' in your browser to see it.'),
-        );
+        console.log(kleur.dim('  (Opened it in your browser for you.)'));
       }
     } else {
-      console.log(kleur.bold().green('  ✓ All set. One thing left:'));
-      console.log();
       console.log(
-        '  Start your dev server with ' +
+        kleur.bold().green('✓ All set. ') +
+          'Start your dev server (' +
           kleur.cyan(devCommand(pm)) +
-          ', then open the URL it prints.',
-      );
-      console.log(
-        '  A moving dot appears in the bottom-left — that\'s the Loupe demo scene.',
-      );
-      console.log(
-        '  The floating ' +
-          kleur.cyan('Loupe') +
-          ' panel shows up in the corner.',
+          ') and the Loupe timeline panel appears at the bottom of the page.',
       );
     }
     console.log();
-    console.log(
-      kleur.dim('  Want to review your own animations later? ') +
-        kleur.cyan('https://github.com/arinze-clinton/loupe-motion'),
-    );
-    console.log();
-    printGoodToKnow(invocation);
     return;
   }
 
