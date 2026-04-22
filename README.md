@@ -13,14 +13,37 @@
 
 ## Install
 
+Pick the command for your package manager. If you're not sure which one your project uses, check which lockfile is at the project root: `package-lock.json` (npm), `pnpm-lock.yaml` (pnpm), `yarn.lock` (yarn), `bun.lockb` (bun).
+
+**npm**
 ```bash
 npm install @arinze-clinton/loupe -D
 npx loupe init
 ```
 
+**pnpm**
+```bash
+pnpm add @arinze-clinton/loupe -D
+pnpm dlx loupe init
+```
+
+**yarn**
+```bash
+yarn add @arinze-clinton/loupe -D
+yarn dlx loupe init
+```
+
+**bun**
+```bash
+bun add @arinze-clinton/loupe -D
+bunx loupe init
+```
+
 No registry config, no auth setup. `loupe init` walks you through wiring the panel into your app and installs the bundled Claude skill so you can talk to Loupe in plain English from your editor.
 
 If Loupe is already installed in this project, `loupe init` will say so and show you the installed version instead of re-prompting.
+
+> The three commands below all show `npx` for brevity. Swap `npx` → `pnpm dlx`, `yarn dlx`, or `bunx` depending on your package manager.
 
 ### Check your version
 
@@ -36,7 +59,19 @@ Prints the version you have installed, what range `package.json` declares, and t
 npx loupe uninstall
 ```
 
-Removes the `@arinze-clinton/loupe` dependency and the files `loupe init` wrote (`loupe.example.tsx`, `.claude/skills/loupe/SKILL.md`). Won't touch files you've edited. Auto-detects npm / pnpm / yarn / bun from your lockfile.
+Removes the `@arinze-clinton/loupe` dependency and the files `loupe init` wrote (`loupe.example.tsx`, `.claude/skills/loupe/SKILL.md`). Won't touch files you've edited. Auto-detects npm / pnpm / yarn / bun from your lockfile and uses the right uninstall command.
+
+### Troubleshooting
+
+**"npm error Cannot read properties of null (reading 'matches')"**
+Your project uses a different package manager than `npm` — usually pnpm. Check for `pnpm-lock.yaml` / `yarn.lock` / `bun.lockb` at the project root and use the matching install command above.
+
+**"Unknown command: check" (or `uninstall`)**
+You're hitting a cached older version. Force the latest:
+```bash
+npx @arinze-clinton/loupe@latest --version
+```
+Should print `loupe v0.2.2` or higher. If not, clear npx's cache (`rm -rf ~/.npm/_npx`) and try again.
 
 ## Usage
 
