@@ -5,10 +5,14 @@ import kleur from 'kleur';
 import prompts from 'prompts';
 import {
   checkInstall,
+  detectFramework,
   detectInvoker,
   detectPackageManager,
+  detectRunningDevServer,
+  devCommand,
   loupeInvocation,
   warnOnInvokerMismatch,
+  type Framework,
 } from '../util.js';
 
 // tsup ships this file as ESM; `__dirname` isn't defined there.
@@ -110,9 +114,11 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     return;
   }
 
-  // 1. Sample wiring file — always written, gives the user a copy-paste reference.
+  // 1. Sample wiring file — framework-aware so the example matches
+  //    the imports / entry-file shape of the user's stack.
+  const framework = await detectFramework(cwd);
   const sampleFile = path.join(cwd, 'loupe.example.tsx');
-  await writeIfMissing(sampleFile, sampleWiring(answers.mount));
+  await writeIfMissing(sampleFile, sampleWiring(answers.mount, framework));
   console.log(kleur.green('  ✓ ') + path.relative(cwd, sampleFile));
 
   // 2. Claude skill — opt-in.
@@ -136,6 +142,8 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   }
 
   const invocation = (cmd: string) => loupeInvocation(pm, cmd, 'local');
+  const entryFile = entryFileFor(framework);
+  const running = await detectRunningDevServer(framework);
 
   console.log();
   console.log(kleur.bold('Next steps'));
@@ -143,48 +151,77 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   console.log(
     '  ' +
       kleur.bold('1.') +
-      ' Open the file ' +
+      ' Open ' +
       kleur.cyan('loupe.example.tsx') +
       ' (just created in this folder).',
   );
-  console.log('     It has a commented block showing exactly how to mount Loupe.');
+  console.log(
+    '     It has the exact code to paste into your app, ready to go.',
+  );
   console.log();
-  console.log(
-    '  ' +
-      kleur.bold('2.') +
-      ' Find your app\'s top-level entry file. Typically one of:',
-  );
-  console.log(
-    kleur.dim('       • Next.js:') + '  app/layout.tsx (or src/app/layout.tsx)',
-  );
-  console.log(kleur.dim('       • Vite:   ') + '  src/main.tsx or src/App.tsx');
-  console.log(kleur.dim('       • Remix:  ') + '  app/root.tsx');
-  console.log(
-    '     Paste the wiring from ' +
-      kleur.cyan('loupe.example.tsx') +
-      ' into that file,',
-  );
-  console.log('     following the comments for where to put each piece.');
+  if (entryFile) {
+    console.log(
+      '  ' +
+        kleur.bold('2.') +
+        ' Paste that code into ' +
+        kleur.cyan(entryFile.path) +
+        '.',
+    );
+    if (entryFile.note) {
+      console.log(`     ${kleur.dim(entryFile.note)}`);
+    }
+  } else {
+    console.log(
+      '  ' +
+        kleur.bold('2.') +
+        ' Paste the code into your app\'s top-level entry file.',
+    );
+    console.log(
+      kleur.dim('       • Next.js:') + '  app/layout.tsx (or src/app/layout.tsx)',
+    );
+    console.log(kleur.dim('       • Vite:   ') + '  src/main.tsx or src/App.tsx');
+    console.log(kleur.dim('       • Remix:  ') + '  app/root.tsx');
+    console.log(kleur.dim('       • Astro:  ') + '  src/layouts/*.astro + a React island');
+  }
   console.log();
   console.log(
     '  ' +
       kleur.bold('3.') +
-      ' For each animation you want to review, wrap it in',
+      ' Pick ONE animation to start. Wrap it in ' +
+      kleur.cyan('<TimelineProvider>') +
+      '.',
   );
   console.log(
-    '     ' + kleur.cyan('<TimelineProvider config={…}>') + '. The example',
+    '     The example shows syntax. Expand to more scenes later.',
   );
-  console.log("     shows how. Don't worry about all animations at once —");
-  console.log('     start with one scene and expand from there.');
   console.log();
-  console.log(
-    '  ' +
-      kleur.bold('4.') +
-      ' Start your dev server and look for the floating ' +
-      kleur.cyan('Loupe') +
-      ' panel.',
-  );
-  console.log('     Click any scene in the dropdown → scrub, pause, annotate.');
+  if (running) {
+    console.log(
+      '  ' +
+        kleur.bold('4.') +
+        ' Your dev server is already running at ' +
+        kleur.cyan(running.url) +
+        '.',
+    );
+    console.log(
+      '     Save the files above → the page refreshes → look for the floating ' +
+        kleur.cyan('Loupe') +
+        ' panel in the corner.',
+    );
+  } else {
+    console.log(
+      '  ' +
+        kleur.bold('4.') +
+        ' Start your dev server with ' +
+        kleur.cyan(devCommand(pm)) +
+        ',',
+    );
+    console.log(
+      '     then open the URL it prints. The floating ' +
+        kleur.cyan('Loupe') +
+        ' panel will appear in the corner.',
+    );
+  }
   console.log();
   console.log(
     kleur.dim('  Need the full walkthrough? ') +
@@ -210,6 +247,48 @@ export async function init({ cwd }: InitOptions): Promise<void> {
   console.log();
 }
 
+/**
+ * The most likely entry-file path for a given framework. Returned
+ * as a single string so next-steps output reads crisp ("Paste into
+ * app/layout.tsx"). `null` when we don't know the framework and
+ * should show the generic bulleted list instead.
+ */
+function entryFileFor(
+  framework: Framework,
+): { path: string; note?: string } | null {
+  switch (framework) {
+    case 'nextjs':
+      return {
+        path: 'app/layout.tsx',
+        note:
+          'If you use the Pages Router, paste into pages/_app.tsx instead.',
+      };
+    case 'vite':
+      return {
+        path: 'src/main.tsx',
+        note: 'Wrap the root <App /> before calling createRoot(...).render(...).',
+      };
+    case 'remix':
+      return {
+        path: 'app/root.tsx',
+        note: 'Put the wiring inside the <body> in the default export.',
+      };
+    case 'astro':
+      return {
+        path: 'src/layouts/Layout.astro',
+        note:
+          'Render a React island and mount Loupe inside it (Astro pages are .astro, Loupe is React).',
+      };
+    case 'cra':
+      return {
+        path: 'src/index.tsx',
+        note: 'Wrap your <App /> before passing it to ReactDOM.render(...).',
+      };
+    case 'unknown':
+      return null;
+  }
+}
+
 async function writeIfMissing(file: string, content: string): Promise<void> {
   try {
     await fs.access(file);
@@ -226,10 +305,26 @@ async function writeIfMissing(file: string, content: string): Promise<void> {
   await fs.writeFile(file, content, 'utf8');
 }
 
-function sampleWiring(mount: 'auto' | 'manual'): string {
+function sampleWiring(mount: 'auto' | 'manual', framework: Framework): string {
+  switch (framework) {
+    case 'nextjs':
+      return nextjsSample(mount);
+    case 'remix':
+      return remixSample(mount);
+    case 'astro':
+      return astroSample(mount);
+    case 'vite':
+    case 'cra':
+    case 'unknown':
+    default:
+      return viteSample(mount);
+  }
+}
+
+function viteSample(mount: 'auto' | 'manual'): string {
   if (mount === 'auto') {
-    return `// Loupe — auto-mount sample wiring.
-// Copy this into your app root (e.g. main.tsx or App.tsx).
+    return `// Loupe — paste this into src/main.tsx (or your app root).
+// Works with Vite + React (import.meta.env.DEV check is Vite-specific).
 
 import {
   LoupeRegistryProvider,
@@ -238,8 +333,9 @@ import {
   AnnotationOverlay,
   AnnotationPins,
 } from '@arinze-clinton/loupe';
+import '@arinze-clinton/loupe/styles.css';
 
-const isDev = import.meta.env?.DEV ?? process.env.NODE_ENV !== 'production';
+const isDev = import.meta.env?.DEV;
 
 export function withLoupe(children: React.ReactNode) {
   return (
@@ -258,12 +354,13 @@ export function withLoupe(children: React.ReactNode) {
   );
 }
 
-// Then in your root render:
-//   ReactDOM.createRoot(document.getElementById('root')!).render(withLoupe(<App />));
+// In your root render (src/main.tsx typically looks like this):
+//   ReactDOM.createRoot(document.getElementById('root')!).render(
+//     withLoupe(<App />)
+//   );
 `;
   }
-  return `// Loupe — manual-mount sample wiring.
-// Copy what you need into your app root.
+  return `// Loupe — manual-mount sample wiring (Vite + React).
 
 import {
   LoupeRegistryProvider,
@@ -272,11 +369,7 @@ import {
   AnnotationOverlay,
   AnnotationPins,
 } from '@arinze-clinton/loupe';
-
-// You decide when Loupe shows up. Examples:
-//   - dev only:        const showLoupe = import.meta.env.DEV;
-//   - feature flag:    const showLoupe = window.location.search.includes('loupe=1');
-//   - keybind toggle:  manage a useState('loupeOpen', false) and bind a hotkey.
+import '@arinze-clinton/loupe/styles.css';
 
 export function App() {
   const showLoupe = import.meta.env?.DEV;
@@ -297,4 +390,126 @@ export function App() {
   );
 }
 `;
+}
+
+function nextjsSample(mount: 'auto' | 'manual'): string {
+  return `'use client';
+
+// Loupe — paste this into app/layout.tsx (App Router) OR
+// use it from pages/_app.tsx (Pages Router).
+//
+// Loupe is a client component — the 'use client' directive above
+// is required when you place it in a Next.js layout.
+
+import {
+  LoupeRegistryProvider,
+  LoupePanel,
+  AnnotationsProvider,
+  AnnotationOverlay,
+  AnnotationPins,
+} from '@arinze-clinton/loupe';
+import '@arinze-clinton/loupe/styles.css';
+
+const isDev = process.env.NODE_ENV !== 'production';
+
+export function WithLoupe({ children }: { children: React.ReactNode }) {
+  return (
+    <LoupeRegistryProvider>
+      <AnnotationsProvider>
+        {children}
+        {isDev && (
+          <>
+            <LoupePanel />
+            <AnnotationOverlay />
+            <AnnotationPins />
+          </>
+        )}
+      </AnnotationsProvider>
+    </LoupeRegistryProvider>
+  );
+}
+
+// ── App Router (app/layout.tsx) ────────────────────────────────
+// Wrap your children with <WithLoupe>:
+//
+//   export default function RootLayout({ children }) {
+//     return (
+//       <html lang="en">
+//         <body>
+//           <WithLoupe>{children}</WithLoupe>
+//         </body>
+//       </html>
+//     );
+//   }
+//
+// ── Pages Router (pages/_app.tsx) ──────────────────────────────
+// Wrap the <Component />:
+//
+//   export default function App({ Component, pageProps }) {
+//     return (
+//       <WithLoupe>
+//         <Component {...pageProps} />
+//       </WithLoupe>
+//     );
+//   }
+${mount === 'auto' ? '' : '\n// Manual mode: gate `isDev` on whatever signal you want\n// (feature flag, hotkey, query param).\n'}`;
+}
+
+function remixSample(mount: 'auto' | 'manual'): string {
+  return `// Loupe — paste this into app/root.tsx.
+// Remix root already exports a default component wrapping your
+// document; add WithLoupe INSIDE the <body>.
+
+import {
+  LoupeRegistryProvider,
+  LoupePanel,
+  AnnotationsProvider,
+  AnnotationOverlay,
+  AnnotationPins,
+} from '@arinze-clinton/loupe';
+import '@arinze-clinton/loupe/styles.css';
+
+const isDev = process.env.NODE_ENV !== 'production';
+
+export function WithLoupe({ children }: { children: React.ReactNode }) {
+  return (
+    <LoupeRegistryProvider>
+      <AnnotationsProvider>
+        {children}
+        {isDev && (
+          <>
+            <LoupePanel />
+            <AnnotationOverlay />
+            <AnnotationPins />
+          </>
+        )}
+      </AnnotationsProvider>
+    </LoupeRegistryProvider>
+  );
+}
+
+// Usage in app/root.tsx:
+//
+//   export default function App() {
+//     return (
+//       <html>
+//         <head><Meta /><Links /></head>
+//         <body>
+//           <WithLoupe>
+//             <Outlet />
+//           </WithLoupe>
+//           <Scripts />
+//         </body>
+//       </html>
+//     );
+//   }
+${mount === 'auto' ? '' : '\n// Manual mode: replace `isDev` with your own gate.\n'}`;
+}
+
+function astroSample(mount: 'auto' | 'manual'): string {
+  // Astro surfaces Loupe via a React island, not the .astro file.
+  return viteSample(mount).replace(
+    '// Works with Vite + React',
+    '// For Astro: place this in a .tsx component loaded as a React island (client:load).',
+  );
 }

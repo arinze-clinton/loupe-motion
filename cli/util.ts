@@ -146,6 +146,107 @@ export function detectInvoker(): PackageManager | null {
 }
 
 /**
+ * Framework detection for the host project. Return value powers:
+ *   - the tailored `loupe.example.tsx` wiring template
+ *   - which entry file path(s) the next-steps output points to
+ *   - which dev-server port + start-command we suggest
+ *
+ * `'unknown'` means we couldn't classify — the init still runs and
+ * emits a generic example with all framework branches documented
+ * in comments.
+ */
+export type Framework =
+  | 'nextjs'
+  | 'vite'
+  | 'remix'
+  | 'astro'
+  | 'cra'
+  | 'unknown';
+
+export async function detectFramework(cwd: string): Promise<Framework> {
+  try {
+    const raw = await fs.readFile(path.join(cwd, 'package.json'), 'utf8');
+    const pkg = JSON.parse(raw) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+    if (deps['next']) return 'nextjs';
+    if (deps['astro']) return 'astro';
+    if (
+      deps['@remix-run/react'] ||
+      deps['@remix-run/node'] ||
+      deps['@remix-run/serve']
+    ) {
+      return 'remix';
+    }
+    if (deps['vite']) return 'vite';
+    if (deps['react-scripts']) return 'cra';
+  } catch {
+    /* fall through */
+  }
+  return 'unknown';
+}
+
+/**
+ * Detect if a dev server is already listening on the expected port
+ * for the given framework. Best-effort — never blocks longer than
+ * ~200ms total so `loupe init` doesn't feel laggy.
+ */
+export async function detectRunningDevServer(
+  framework: Framework,
+): Promise<{ port: number; url: string } | null> {
+  const port = defaultDevPort(framework);
+  if (!port) return null;
+  const listening = await isPortListening(port, 150);
+  return listening ? { port, url: `http://localhost:${port}` } : null;
+}
+
+function defaultDevPort(framework: Framework): number | null {
+  switch (framework) {
+    case 'nextjs': return 3000;
+    case 'remix': return 3000;
+    case 'vite': return 5173;
+    case 'astro': return 4321;
+    case 'cra': return 3000;
+    case 'unknown': return null;
+  }
+}
+
+async function isPortListening(port: number, timeoutMs: number): Promise<boolean> {
+  const net = await import('node:net');
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let done = false;
+    const finish = (result: boolean) => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      resolve(result);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once('connect', () => finish(true));
+    socket.once('timeout', () => finish(false));
+    socket.once('error', () => finish(false));
+    socket.connect(port, '127.0.0.1');
+  });
+}
+
+/**
+ * The package-manager-appropriate command for `pnpm dev` etc.
+ * Most projects define a `dev` script; we just invoke it.
+ */
+export function devCommand(pm: PackageManager): string {
+  switch (pm) {
+    case 'pnpm': return 'pnpm dev';
+    case 'yarn': return 'yarn dev';
+    case 'bun': return 'bun run dev';
+    case 'npm':
+    default: return 'npm run dev';
+  }
+}
+
+/**
  * Detect which package manager the host project uses.
  * Best-effort — falls back to `npm` if nothing identifiable.
  */
