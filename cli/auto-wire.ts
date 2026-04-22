@@ -145,7 +145,6 @@ import {
   AnnotationOverlay,
   AnnotationPins,
 } from '@arinze-clinton/loupe';
-import '@arinze-clinton/loupe/styles.css';
 // Demo scene so Loupe has something to drive on first run.
 // Replace with your real scenes, or delete both lines when done.
 import { LoupeDemoScene } from './loupe-demo-scene';

@@ -1,6 +1,6 @@
 {
   "name": "@arinze-clinton/loupe",
-  "version": "0.2.10",
+  "version": "0.2.11",
   "description": "Timeline-first motion authoring tool — scrub, annotate, and review React animations against a deterministic timeline.",
   "license": "SEE LICENSE IN LICENSE",
   "private": false,
@@ -38,7 +38,7 @@
     "url": "git+https://github.com/arinze-clinton/loupe-motion.git"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node -e \"require('fs').mkdirSync('dist',{recursive:true}); require('fs').writeFileSync('dist/styles.css','/* Loupe — panel uses inline styles. This file exists to satisfy the \\`@arinze-clinton/loupe/styles.css\\` import kept for backward compatibility with older generated code. */\\n')\"",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"

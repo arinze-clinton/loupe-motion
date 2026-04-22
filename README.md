@@ -89,7 +89,6 @@ import {
   LoupeRegistryProvider,
   LoupePanel,
 } from '@arinze-clinton/loupe';
-import '@arinze-clinton/loupe/styles.css';
 
 function App() {
   return (

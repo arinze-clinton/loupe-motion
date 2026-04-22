@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { useLoupeRegistry } from '../runtime/registry';
 import { phaseAtTime, rangeOf } from '../runtime/phases';
 import { useAnnotations } from '../annotations/AnnotationsProvider';
@@ -719,21 +720,56 @@ function ActiveScenePanel({
 
 function ScenePicker({ registry }: { registry: Registry }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  // `buttonRef` is the trigger; `menuRef` is the portalled popover.
+  // Keeping both refs so the outside-click handler knows to ignore
+  // clicks that land inside either (otherwise the popover closes
+  // the instant the user clicks an item).
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
   const active = registry.scenes.find((s) => s.id === registry.activeSceneId);
+
+  // Recompute the popover anchor each time it opens (or the viewport
+  // resizes). The panel has `overflow: hidden` on its outer wrapper
+  // — any absolute child gets clipped — so the menu lives in a
+  // React portal outside that container and is anchored via fixed
+  // coords pulled from the trigger button's bounding rect.
+  useEffect(() => {
+    if (!open) {
+      setMenuPos(null);
+      return;
+    }
+    const update = () => {
+      const btn = buttonRef.current;
+      if (!btn) return;
+      const rect = btn.getBoundingClientRect();
+      setMenuPos({ left: rect.left, top: rect.top });
+    };
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('scroll', update, true);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('scroll', update, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (buttonRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     window.addEventListener('mousedown', onClick);
     return () => window.removeEventListener('mousedown', onClick);
   }, [open]);
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div style={{ position: 'relative' }}>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         style={{
@@ -758,19 +794,28 @@ function ScenePicker({ registry }: { registry: Registry }) {
           <path d="M3 5l4 4 4-4" />
         </svg>
       </button>
-      {open && (
+      {open && menuPos &&
+        typeof document !== 'undefined' &&
+        createPortal(
         <div
+          ref={menuRef}
           style={{
-            position: 'absolute',
-            bottom: 'calc(100% + 6px)',
-            left: 0,
+            position: 'fixed',
+            // Float above the trigger — translateY pulls the menu
+            // back by its own height + 6px so its bottom edge sits
+            // 6px above the button's top edge.
+            left: menuPos.left,
+            top: menuPos.top,
+            transform: 'translateY(calc(-100% - 6px))',
             minWidth: 180,
             background: '#121419',
             border: '1px solid rgba(255,255,255,0.12)',
             borderRadius: 10,
             padding: 4,
             boxShadow: '0 12px 30px rgba(0,0,0,0.4)',
-            zIndex: 10060,
+            zIndex: 2147483647,
+            color: PANEL_FG,
+            fontFamily: FONT,
           }}
         >
           {registry.scenes.length === 0 && (
@@ -827,7 +872,8 @@ function ScenePicker({ registry }: { registry: Registry }) {
               </button>
             );
           })}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );

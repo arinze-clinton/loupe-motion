@@ -404,7 +404,6 @@ import {
   AnnotationOverlay,
   AnnotationPins,
 } from '@arinze-clinton/loupe';
-import '@arinze-clinton/loupe/styles.css';
 
 const isDev = import.meta.env?.DEV;
 
@@ -440,7 +439,6 @@ import {
   AnnotationOverlay,
   AnnotationPins,
 } from '@arinze-clinton/loupe';
-import '@arinze-clinton/loupe/styles.css';
 
 export function App() {
   const showLoupe = import.meta.env?.DEV;
@@ -479,7 +477,6 @@ import {
   AnnotationOverlay,
   AnnotationPins,
 } from '@arinze-clinton/loupe';
-import '@arinze-clinton/loupe/styles.css';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
@@ -538,7 +535,6 @@ import {
   AnnotationOverlay,
   AnnotationPins,
 } from '@arinze-clinton/loupe';
-import '@arinze-clinton/loupe/styles.css';
 
 const isDev = process.env.NODE_ENV !== 'production';
 
