@@ -133,6 +133,7 @@ export async function autoWireNextjs(cwd: string): Promise<AutoWireResult | null
  */
 export async function upgradeDemoSceneIfGenerated(
   cwd: string,
+  opts: { backup?: boolean } = {},
 ): Promise<string[]> {
   const candidates = [
     'app/loupe-demo-scene.tsx',
@@ -155,6 +156,9 @@ export async function upgradeDemoSceneIfGenerated(
     // Already on the latest template — no-op.
     if (src.includes(LOUPE_DEMO_GENERATED_MARKER) && src.includes('useOptionalLoupeRegistry')) {
       continue;
+    }
+    if (opts.backup) {
+      await fs.writeFile(`${abs}.loupe-backup`, src, 'utf8');
     }
     await fs.writeFile(abs, NEXTJS_DEMO_SCENE_TEMPLATE, 'utf8');
     upgraded.push(rel);

@@ -10,7 +10,10 @@ async function main() {
 
   switch (cmd) {
     case 'init':
-      await init({ cwd: process.cwd() });
+      await init({
+        cwd: process.cwd(),
+        upgradeDemo: rest.includes('--upgrade-demo'),
+      });
       break;
     case 'scan': {
       const json = rest.includes('--json');
@@ -53,6 +56,7 @@ ${kleur.bold('Loupe')} — timeline-first motion authoring tool
 
 ${kleur.bold('Usage')}
   loupe ${kleur.cyan('init')}            Wire Loupe into your project + install the Claude skill
+  loupe ${kleur.cyan('init --upgrade-demo')}  Rewrite a generated loupe-demo-scene.tsx to the latest template (with backup)
   loupe ${kleur.cyan('scan')} [--json]   Report which animations are timeline-bound
   loupe ${kleur.cyan('check')}           Show installed version + check for updates
   loupe ${kleur.cyan('uninstall')}       Remove Loupe cleanly (dep + generated files)

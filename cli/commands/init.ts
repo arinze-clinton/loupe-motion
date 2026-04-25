@@ -43,9 +43,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 type InitOptions = {
   cwd: string;
+  /**
+   * Opt-in flag: rewrite a previously-generated `loupe-demo-scene.tsx`
+   * to the latest template. Off by default — `loupe init` should
+   * never silently overwrite files in the host repo. When on, the
+   * existing file is backed up to `<file>.loupe-backup` first.
+   */
+  upgradeDemo?: boolean;
 };
 
-export async function init({ cwd }: InitOptions): Promise<void> {
+export async function init({ cwd, upgradeDemo = false }: InitOptions): Promise<void> {
   console.log();
   console.log(kleur.bold().cyan('Loupe ✦ ') + 'timeline-first motion authoring');
   console.log(kleur.dim('Setting up Loupe in this project.\n'));
@@ -80,23 +87,34 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     );
     console.log();
 
-    // Even when we're short-circuiting, silently upgrade any Loupe-
-    // generated demo-scene file so users pick up quality-of-life
-    // improvements without having to opt into the full re-prompt
-    // flow. Only touches files carrying our generation marker —
-    // user-edited files are left alone.
-    try {
-      const upgraded = await upgradeDemoSceneIfGenerated(cwd);
-      for (const rel of upgraded) {
+    // Opt-in demo-scene upgrade: only runs when the user explicitly
+    // passed `--upgrade-demo`. Previous releases auto-rewrote any
+    // file matching the generation marker on every `init` invocation,
+    // which silently mutated the host repo. Now we always require an
+    // explicit opt-in and back up before writing.
+    if (upgradeDemo) {
+      try {
+        const upgraded = await upgradeDemoSceneIfGenerated(cwd, { backup: true });
+        for (const rel of upgraded) {
+          console.log(
+            kleur.green('  ✓ ') +
+              rel +
+              kleur.dim('  (demo scene upgraded; backup at ' + rel + '.loupe-backup)'),
+          );
+        }
+        if (upgraded.length === 0) {
+          console.log(
+            kleur.dim('  No generated demo-scene file found to upgrade.'),
+          );
+        }
+        console.log();
+      } catch (err) {
         console.log(
-          kleur.green('  ✓ ') +
-            rel +
-            kleur.dim('  (demo scene upgraded to latest template)'),
+          kleur.yellow('  ! ') +
+            'Demo-scene upgrade failed: ' +
+            (err instanceof Error ? err.message : String(err)),
         );
       }
-      if (upgraded.length > 0) console.log();
-    } catch {
-      /* non-blocking */
     }
 
     // Still offer to (re)write the sample wiring / skill for users
@@ -246,21 +264,26 @@ export async function init({ cwd }: InitOptions): Promise<void> {
     );
   }
 
-  // 3c. Silently upgrade a pre-existing loupe-demo-scene.tsx so it
-  //     uses the latest template (v0.2.15: hides the dot unless
-  //     Demo is actively selected). User-edited files are detected
-  //     by the absence of our generation marker and left alone.
-  try {
-    const upgraded = await upgradeDemoSceneIfGenerated(cwd);
-    for (const rel of upgraded) {
+  // 3c. Optional demo-scene upgrade. Only runs when the user passed
+  //     `--upgrade-demo` — previously this rewrote files silently on
+  //     every init. Backs up the original before writing.
+  if (upgradeDemo) {
+    try {
+      const upgraded = await upgradeDemoSceneIfGenerated(cwd, { backup: true });
+      for (const rel of upgraded) {
+        console.log(
+          kleur.green('  ✓ ') +
+            rel +
+            kleur.dim('  (demo scene upgraded; backup at ' + rel + '.loupe-backup)'),
+        );
+      }
+    } catch (err) {
       console.log(
-        kleur.green('  ✓ ') +
-          rel +
-          kleur.dim('  (demo scene upgraded to latest template)'),
+        kleur.yellow('  ! ') +
+          'Demo-scene upgrade failed: ' +
+          (err instanceof Error ? err.message : String(err)),
       );
     }
-  } catch {
-    /* best-effort — a bad demo-scene upgrade isn't worth blocking init */
   }
 
   const invocation = (cmd: string) => loupeInvocation(pm, cmd, 'local');
