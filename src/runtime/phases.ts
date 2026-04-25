@@ -37,6 +37,17 @@ export function rangeOf(ranges: PhaseRange[], phase: string): PhaseRange {
   return found;
 }
 
+/**
+ * Wrap `t` into the range `[0, total)`. Used by the rAF tick to keep
+ * `time` bounded after the loop hits the end. Handles dt accumulating
+ * beyond a single period (e.g. tab backgrounded, then resumed) and
+ * negative inputs.
+ */
+export function wrapTime(t: number, total: number): number {
+  if (total <= 0) return t;
+  return ((t % total) + total) % total;
+}
+
 export function phaseAtTime(
   ranges: PhaseRange[],
   totalDuration: number,

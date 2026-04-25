@@ -10,6 +10,7 @@ import { motionValue, type MotionValue } from 'framer-motion';
 import {
   computeRanges,
   totalDurationFor,
+  wrapTime,
   type PhaseRange,
   type SceneConfig,
 } from './phases';
@@ -68,9 +69,7 @@ export function TimelineProvider({
       if (lastTimestampRef.current === null) lastTimestampRef.current = t;
       const dt = (t - lastTimestampRef.current) * speed;
       lastTimestampRef.current = t;
-      let next = time.get() + dt;
-      if (totalDuration > 0 && next >= totalDuration) next = next - totalDuration;
-      time.set(next);
+      time.set(wrapTime(time.get() + dt, totalDuration));
       rafRef.current = requestAnimationFrame(tick);
     };
     rafRef.current = requestAnimationFrame(tick);
@@ -155,7 +154,20 @@ export function TimelineProvider({
 
   return (
     <TimelineContext.Provider value={value}>
-      <SceneRootRefProvider refValue={sceneRootRef}>{children}</SceneRootRefProvider>
+      <SceneRootRefProvider refValue={sceneRootRef}>
+        {/*
+          The registry's flash/scroll-to-scene overlay needs a real
+          DOM node to measure. We wrap children in a `display:contents`
+          div so the ref points somewhere concrete without inserting a
+          layout box — host flex/grid still sees the scene's content
+          as a direct child. Hosts that need a different wrapper can
+          use `useSceneRootRef()` and attach it themselves; this is
+          just the safe default.
+        */}
+        <div ref={sceneRootRef as React.RefObject<HTMLDivElement>} style={{ display: 'contents' }}>
+          {children}
+        </div>
+      </SceneRootRefProvider>
     </TimelineContext.Provider>
   );
 }

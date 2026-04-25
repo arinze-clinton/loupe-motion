@@ -41,6 +41,8 @@
     "build": "tsup && node -e \"require('fs').mkdirSync('dist',{recursive:true}); require('fs').writeFileSync('dist/styles.css','/* Loupe — panel uses inline styles. This file exists to satisfy the \\`@arinze-clinton/loupe/styles.css\\` import kept for backward compatibility with older generated code. */\\n')\"",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rm -rf dist",
     "postpublish": "node -e \"const v='v'+require('./package.json').version; require('child_process').execSync('git tag -f '+v+' && git push origin '+v, {stdio:'inherit'})\""
   },
@@ -64,17 +66,20 @@
     "prompts": "^2.4.2"
   },
   "devDependencies": {
+    "@testing-library/react": "^14.3.1",
     "@types/babel__traverse": "^7.20.5",
     "@types/node": "^20.11.0",
     "@types/prompts": "^2.4.9",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "framer-motion": "^11.0.0",
+    "happy-dom": "^20.9.0",
     "lottie-web": "^5.12.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "vitest": "^1.6.1"
   },
   "keywords": [
     "animation",
