@@ -37,6 +37,34 @@ export function AnnotationOverlay() {
   );
 }
 
+/**
+ * Cross-fade-aware element-picker threshold.
+ *
+ * `document.elementsFromPoint` returns the full hit-stack at a coordinate,
+ * but it doesn't filter for visibility — `opacity: 0` elements still hit-
+ * test. Animations stack multiple full-bleed surfaces and cross-fade
+ * between them via opacity, so the topmost element under the cursor is
+ * often a transparent ghost. We multiply opacity along the ancestor chain
+ * and skip anything below this threshold to recover the element the user
+ * can actually see. Threshold is intentionally low so faintly-fading
+ * surfaces (mid-cross-fade) remain pickable.
+ */
+const VISIBILITY_THRESHOLD = 0.05;
+
+function effectiveOpacity(el: Element): number {
+  let opacity = 1;
+  let cursor: Element | null = el;
+  while (cursor) {
+    const cs = window.getComputedStyle(cursor);
+    if (cs.visibility === 'hidden' || cs.display === 'none') return 0;
+    const o = parseFloat(cs.opacity);
+    if (Number.isFinite(o)) opacity *= o;
+    if (opacity <= 0) return 0;
+    cursor = cursor.parentElement;
+  }
+  return opacity;
+}
+
 function ElementPicker({
   onPick,
   onCancel,
@@ -50,11 +78,22 @@ function ElementPicker({
   const resolveTarget = (clientX: number, clientY: number): HTMLElement | null => {
     const overlay = overlayRef.current;
     if (overlay) overlay.style.pointerEvents = 'none';
-    const el = document.elementFromPoint(clientX, clientY);
+    // Walk the full hit-stack instead of grabbing only the topmost element.
+    // Reason: animations commonly cross-fade two or more surfaces stacked at
+    // the same position via opacity; `elementFromPoint` would happily return
+    // an `opacity: 0` ghost layer sitting above the visible one. We prefer the
+    // first element in z-order whose *effective* opacity (multiplied along
+    // its ancestor chain) is above a small threshold — i.e. what the user
+    // can actually see.
+    const stack = document.elementsFromPoint(clientX, clientY);
     if (overlay) overlay.style.pointerEvents = 'auto';
-    if (!el || !(el instanceof HTMLElement)) return null;
-    if (el.closest('[data-loupe-ui]')) return null;
-    return el;
+    for (const candidate of stack) {
+      if (!(candidate instanceof HTMLElement)) continue;
+      if (candidate.closest('[data-loupe-ui]')) continue;
+      if (effectiveOpacity(candidate) < VISIBILITY_THRESHOLD) continue;
+      return candidate;
+    }
+    return null;
   };
 
   useEffect(() => {
