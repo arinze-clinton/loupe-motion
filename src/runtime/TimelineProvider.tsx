@@ -156,17 +156,26 @@ export function TimelineProvider({
     <TimelineContext.Provider value={value}>
       <SceneRootRefProvider refValue={sceneRootRef}>
         {/*
-          The registry's flash/scroll-to-scene overlay needs a real
-          DOM node to measure. We wrap children in a `display:contents`
-          div so the ref points somewhere concrete without inserting a
-          layout box — host flex/grid still sees the scene's content
-          as a direct child. Hosts that need a different wrapper can
-          use `useSceneRootRef()` and attach it themselves; this is
-          just the safe default.
+          We deliberately do NOT attach the scene ref to a wrapper here.
+          Earlier versions wrapped children in a `display: contents` div
+          and pinned the ref to it as a "safe default" so the registry's
+          flash overlay always had something to measure. Two problems
+          surfaced from that:
+            1. React's commit order made the wrapper's ref-attach run AFTER
+               any consumer that attached the same ref to their own root,
+               so the ref ended up on the `display: contents` element.
+            2. IntersectionObserver (the engine behind framer-motion's
+               `useInView`) treats `display: contents` elements as having
+               no layout box on most engines, so consumers' in-view
+               auto-pause logic silently never fired `true` and scenes
+               appeared frozen.
+          Consumers are expected to call `useSceneRootRef()` and attach
+          the returned ref to their own root element. If a consumer
+          forgets, ref-dependent registry features (flash, scroll-to-
+          scene) degrade gracefully — but timeline playback, panel
+          control, and `useInView`-driven auto-pause all keep working.
         */}
-        <div ref={sceneRootRef as React.RefObject<HTMLDivElement>} style={{ display: 'contents' }}>
-          {children}
-        </div>
+        {children}
       </SceneRootRefProvider>
     </TimelineContext.Provider>
   );
