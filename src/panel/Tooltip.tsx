@@ -36,7 +36,7 @@ export function Tooltip({
   shortcut,
 }: {
   label: string;
-  children: React.ReactElement;
+  children: React.ReactNode;
   placement?: TooltipPlacement;
   /** Optional keyboard shortcut, rendered to the right of the label
    *  in a subtler colour (e.g. "Space"). */
@@ -44,7 +44,7 @@ export function Tooltip({
 }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ x: number; y: number } | null>(null);
-  const triggerRef = useRef<HTMLElement | null>(null);
+  const triggerRef = useRef<HTMLSpanElement | null>(null);
   const timerRef = useRef<number | null>(null);
 
   const cancelTimer = () => {
@@ -54,16 +54,22 @@ export function Tooltip({
     }
   };
 
+  const computeCoords = () => {
+    const el = triggerRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left + r.width / 2,
+      y: placement === 'top' ? r.top : r.bottom,
+    };
+  };
+
   const scheduleOpen = () => {
     cancelTimer();
     timerRef.current = window.setTimeout(() => {
-      const el = triggerRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setCoords({
-        x: r.left + r.width / 2,
-        y: placement === 'top' ? r.top : r.bottom,
-      });
+      const c = computeCoords();
+      if (!c) return;
+      setCoords(c);
       setOpen(true);
     }, SHOW_DELAY_MS);
   };
@@ -80,13 +86,8 @@ export function Tooltip({
   useEffect(() => {
     if (!open) return;
     const reposition = () => {
-      const el = triggerRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setCoords({
-        x: r.left + r.width / 2,
-        y: placement === 'top' ? r.top : r.bottom,
-      });
+      const c = computeCoords();
+      if (c) setCoords(c);
     };
     window.addEventListener('scroll', reposition, true);
     window.addEventListener('resize', reposition);
@@ -94,52 +95,27 @@ export function Tooltip({
       window.removeEventListener('scroll', reposition, true);
       window.removeEventListener('resize', reposition);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, placement]);
 
-  // Empty label or missing children — render only the trigger.
-  if (!label) return children;
-
-  const child = children as React.ReactElement & {
-    ref?: React.Ref<HTMLElement>;
-    props: Record<string, unknown>;
-  };
-
-  // Inject event handlers + ref while preserving anything the
-  // child already had.
-  const enhanced = {
-    ...child.props,
-    ref: (el: HTMLElement | null) => {
-      triggerRef.current = el;
-      const originalRef = (child as { ref?: React.Ref<HTMLElement> }).ref;
-      if (typeof originalRef === 'function') originalRef(el);
-      else if (originalRef && typeof originalRef === 'object') {
-        (originalRef as React.MutableRefObject<HTMLElement | null>).current = el;
-      }
-    },
-    onMouseEnter: (e: React.MouseEvent) => {
-      scheduleOpen();
-      (child.props.onMouseEnter as ((e: React.MouseEvent) => void) | undefined)?.(e);
-    },
-    onMouseLeave: (e: React.MouseEvent) => {
-      close();
-      (child.props.onMouseLeave as ((e: React.MouseEvent) => void) | undefined)?.(e);
-    },
-    onFocus: (e: React.FocusEvent) => {
-      scheduleOpen();
-      (child.props.onFocus as ((e: React.FocusEvent) => void) | undefined)?.(e);
-    },
-    onBlur: (e: React.FocusEvent) => {
-      close();
-      (child.props.onBlur as ((e: React.FocusEvent) => void) | undefined)?.(e);
-    },
-  };
-
-  const cloned = { ...child, props: enhanced };
-
+  // No label → behave as a transparent pass-through (still
+  // wrap so the parent layout is identical with/without).
   return (
     <>
-      {cloned as unknown as React.ReactElement}
-      {open && coords && typeof document !== 'undefined'
+      <span
+        ref={triggerRef}
+        onMouseEnter={label ? scheduleOpen : undefined}
+        onMouseLeave={label ? close : undefined}
+        onFocus={label ? scheduleOpen : undefined}
+        onBlur={label ? close : undefined}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+        }}
+      >
+        {children}
+      </span>
+      {open && label && coords && typeof document !== 'undefined'
         ? createPortal(
             <TooltipBubble
               label={label}

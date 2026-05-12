@@ -549,7 +549,7 @@ function DisabledIconButton({
 
 function PlayIconShape() {
   return (
-    <svg width="10" height="10" viewBox="0 0 14 14" fill="currentColor">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="currentColor">
       <path d="M4 3l8 4-8 4z" />
     </svg>
   );
@@ -557,7 +557,7 @@ function PlayIconShape() {
 
 function RestartIconShape() {
   return (
-    <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 7a4 4 0 1 1 1.2 2.8" />
       <path d="M2 4v3h3" />
     </svg>
@@ -1252,7 +1252,7 @@ function ScenePicker({ registry }: { registry: Registry }) {
         }}
       >
         <span>{active?.label ?? '— Pick a scene'}</span>
-        <svg width="9" height="9" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="9" height="9" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 5l4 4 4-4" />
         </svg>
       </button>
@@ -1624,14 +1624,14 @@ function IconButton({
 
 function PlayIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
       <path d="M3 1.5L12 7L3 12.5V1.5Z" fill="currentColor" />
     </svg>
   );
 }
 function PauseIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
       <rect x="2" y="1" width="3.5" height="12" rx="1" fill="currentColor" />
       <rect x="8.5" y="1" width="3.5" height="12" rx="1" fill="currentColor" />
     </svg>
@@ -1639,60 +1639,52 @@ function PauseIcon() {
 }
 function RestartIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-      <path d="M2 2V6H6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none">
+      <path d="M2 2V6H6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M2.5 6A5 5 0 1 1 3.5 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }
 function CollapseIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 5l4 4 4-4" />
     </svg>
   );
 }
 function ExpandIcon() {
   return (
-    <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 9l4-4 4 4" />
     </svg>
   );
 }
 /**
- * The "Add feedback on element" entry point. Earlier this was a
- * generic cursor/arrow shape, which read as "default cursor" and
- * didn't communicate the actual action (pick a target on screen
- * and add an annotation). New shape: a crosshair with a small plus
- * overlay — universally legible as "pick a point and add something."
+ * The "Add feedback on element" entry point — a crosshair targeting
+ * a circle. Reads as "pick a target on screen."
  */
 function PointerIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="6" cy="6" r="3.5" />
-      <path d="M6 1.5v1.5M6 9v1.5M1.5 6h1.5M9 6h1.5" />
-      <path d="M10 9.5v3M8.5 11h3" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M12 7.99609C9.79218 7.99609 7.99609 9.79218 7.99609 12C7.99609 14.2078 9.79218 16.0039 12 16.0039C14.2078 16.0039 16.0039 14.2078 16.0039 12C16.0039 9.7922 14.2078 7.99609 12 7.99609ZM12 14.8276C10.441 14.8276 9.17246 13.5591 9.17246 12C9.17246 10.4409 10.441 9.17246 12 9.17246C13.559 9.17246 14.8275 10.4409 14.8275 12C14.8275 13.5591 13.559 14.8276 12 14.8276Z" />
+      <path d="M21.4108 11.414H19.5366C19.2505 7.70525 16.2932 4.74869 12.5844 4.46257V2.58817C12.5844 2.2633 12.3235 2 11.9988 2C11.6741 2 11.4132 2.2633 11.4132 2.58817V4.46257C7.70443 4.74867 4.74949 7.70525 4.46335 11.414H2.58915C2.26442 11.414 2.00098 11.6748 2.00098 11.9996C2.00098 12.3245 2.26444 12.5852 2.58915 12.5852H4.46339C4.74951 16.294 7.70447 19.2494 11.4132 19.5355V21.4099C11.4132 21.7348 11.6741 21.9981 11.9988 21.9981C12.3236 21.9981 12.5844 21.7348 12.5844 21.4099V19.5355C16.2932 19.2494 19.2505 16.294 19.5366 12.5852H21.4109C21.7356 12.5852 21.999 12.3245 21.999 11.9996C21.999 11.6748 21.7356 11.414 21.4108 11.414ZM12 18.3818C8.48042 18.3818 5.61703 15.5184 5.61703 11.999C5.61703 8.47962 8.48042 5.61623 12 5.61623C15.5196 5.61623 18.383 8.47962 18.383 11.999C18.383 15.5184 15.5196 18.3818 12 18.3818Z" />
     </svg>
   );
 }
 /**
- * Region / marquee-select tool. Earlier this was four corner-segment
- * dashes which read as "broken rectangle" more than "marquee." New
- * shape: a full dashed selection rectangle with a small solid square
- * inside, the way Figma / Photoshop draw their marquee tools — the
- * convention designers already carry from those apps.
+ * Region / marquee-select tool. Dotted-perimeter rectangle with a "+"
+ * tucked in the bottom-right — reads as "select an area and add."
  */
 function RegionIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="1.5" y="1.5" width="11" height="11" rx="1" strokeDasharray="1.6 1.6" />
-      <rect x="4.5" y="4.5" width="5" height="5" rx="0.5" fill="currentColor" stroke="none" opacity="0.85" />
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <path d="M13 18C13 17.4477 13.4477 17 14 17H17V14C17 13.4477 17.4477 13 18 13C18.5523 13 19 13.4477 19 14V17H22C22.5523 17 23 17.4477 23 18C23 18.5523 22.5523 19 22 19H19V22C19 22.5523 18.5523 23 18 23C17.4477 23 17 22.5523 17 22V19H14C13.4477 19 13 18.5523 13 18ZM10 17C10.5523 17 11 17.4477 11 18C11 18.5523 10.5523 19 10 19C9.44772 19 9 18.5523 9 18C9 17.4477 9.44772 17 10 17ZM6 17C6.55228 17 7 17.4477 7 18C7 18.5523 6.55228 19 6 19C5.44772 19 5 18.5523 5 18C5 17.4477 5.44772 17 6 17ZM18 9C18.5523 9 19 9.44772 19 10C19 10.5523 18.5523 11 18 11C17.4477 11 17 10.5523 17 10C17 9.44772 17.4477 9 18 9ZM18 5C18.5523 5 19 5.44772 19 6C19 6.55228 18.5523 7 18 7C17.4477 7 17 6.55228 17 6C17 5.44772 17.4477 5 18 5ZM14 5C14.5523 5 15 5.44772 15 6C15 6.55228 14.5523 7 14 7C13.4477 7 13 6.55228 13 6C13 5.44772 13.4477 5 14 5ZM10 5C10.5523 5 11 5.44772 11 6C11 6.55228 10.5523 7 10 7C9.44772 7 9 6.55228 9 6C9 5.44772 9.44772 5 10 5ZM6 5C6.55228 5 7 5.44772 7 6C7 6.55228 6.55228 7 6 7C5.44772 7 5 6.55228 5 6C5 5.44772 5.44772 5 6 5ZM6 13C6.55228 13 7 13.4477 7 14C7 14.5523 6.55228 15 6 15C5.44772 15 5 14.5523 5 14C5 13.4477 5.44772 13 6 13ZM6 9C6.55228 9 7 9.44772 7 10C7 10.5523 6.55228 11 6 11C5.44772 11 5 10.5523 5 10C5 9.44772 5.44772 9 6 9Z" />
     </svg>
   );
 }
 function EyeIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.0" strokeLinecap="round" strokeLinejoin="round">
       <path d="M1 7s2-4 6-4 6 4 6 4-2 4-6 4-6-4-6-4z" />
       <circle cx="7" cy="7" r="1.8" />
     </svg>
@@ -1700,7 +1692,7 @@ function EyeIcon() {
 }
 function EyeOffIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="20" height="20" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.0" strokeLinecap="round" strokeLinejoin="round">
       <path d="M2 2l10 10" />
       <path d="M4.2 4.3C2.5 5.3 1 7 1 7s2 4 6 4c1.1 0 2-.2 2.8-.6M11 10.2C12.3 9.3 13 7 13 7s-2-4-6-4c-.6 0-1.1.1-1.7.2" />
     </svg>
@@ -1816,7 +1808,7 @@ function AnnotationList() {
               transition: 'transform 150ms',
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 5l4 4 4-4" />
             </svg>
           </span>
