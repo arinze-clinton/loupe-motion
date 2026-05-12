@@ -20,6 +20,7 @@ import { useAnnotations } from '../annotations/AnnotationsProvider';
 import { annotationsToMarkdown } from '../annotations/export';
 import { Welcome } from './Welcome';
 import { SampleScene, SAMPLE_SCENE_ID } from './SampleScene';
+import { Tooltip } from './Tooltip';
 
 /**
  * Loupe panel — the floating UI at app root, driven by the LoupeRegistry.
@@ -524,10 +525,10 @@ function DisabledIconButton({
   title: string;
 }) {
   return (
-    <span
-      title={title}
-      aria-disabled
-      style={{
+    <Tooltip label={title}>
+      <span
+        aria-disabled
+        style={{
         width: 26,
         height: 26,
         display: 'inline-flex',
@@ -539,9 +540,10 @@ function DisabledIconButton({
         opacity: 0.55,
         cursor: 'not-allowed',
       }}
-    >
-      {children}
-    </span>
+      >
+        {children}
+      </span>
+    </Tooltip>
   );
 }
 
@@ -842,20 +844,21 @@ function ActiveScenePanel({
                       flexWrap: 'wrap',
                     }}
                   >
-                    <span
-                      onPointerDown={(e) => dragControls.start(e)}
-                      title="Drag to move"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        padding: '4px 2px',
-                        cursor: 'grab',
-                        color: '#6B7280',
-                        touchAction: 'none',
-                      }}
-                    >
-                      <GripIcon />
-                    </span>
+                    <Tooltip label="Drag to move the panel">
+                      <span
+                        onPointerDown={(e) => dragControls.start(e)}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          padding: '4px 2px',
+                          cursor: 'grab',
+                          color: '#6B7280',
+                          touchAction: 'none',
+                        }}
+                      >
+                        <GripIcon />
+                      </span>
+                    </Tooltip>
                     <ScenePicker registry={registry} />
                     <span
                       style={{
@@ -928,22 +931,25 @@ function ActiveScenePanel({
                       {annotationsVisible ? <EyeIcon /> : <EyeOffIcon />}
                     </IconButton>
                     {annotations.length > 0 && (
-                      <span
-                        title={`${annotations.length} annotation${annotations.length === 1 ? '' : 's'}`}
-                        style={{
-                          padding: '0 6px',
-                          height: 18,
-                          borderRadius: 999,
-                          background: ACCENT,
-                          color: '#121419',
-                          fontSize: 10,
-                          fontWeight: 700,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                        }}
+                      <Tooltip
+                        label={`${annotations.length} annotation${annotations.length === 1 ? '' : 's'} on this scene`}
                       >
-                        {annotations.length}
-                      </span>
+                        <span
+                          style={{
+                            padding: '0 6px',
+                            height: 18,
+                            borderRadius: 999,
+                            background: ACCENT,
+                            color: '#121419',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          {annotations.length}
+                        </span>
+                      </Tooltip>
                     )}
                     <span
                       style={{
@@ -997,14 +1003,13 @@ function ActiveScenePanel({
                     const widthPct = totalDuration > 0 ? (dur / totalDuration) * 100 : 0;
                     const isActive = p === phase;
                     return (
+                      <Tooltip key={p} label={`${labelFor(p)} · ${formatMs(dur)} · jump here`}>
                       <button
-                        key={p}
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           seek(rangeOf(ranges, p).start);
                         }}
-                        title={`${p} · ${formatMs(dur)}`}
                         style={{
                           flex: `0 0 ${widthPct}%`,
                           minWidth: 0,
@@ -1031,6 +1036,7 @@ function ActiveScenePanel({
                       >
                         {labelFor(p)}
                       </button>
+                      </Tooltip>
                     );
                   })}
 
@@ -1086,19 +1092,20 @@ function ActiveScenePanel({
                   fontFamily: 'inherit',
                 }}
               >
-                <span
-                  onPointerDown={(e) => dragControls.start(e)}
-                  title="Drag to move"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    color: '#6B7280',
-                    cursor: 'grab',
-                    touchAction: 'none',
-                  }}
-                >
-                  <GripIcon />
-                </span>
+                <Tooltip label="Drag to move the panel">
+                  <span
+                    onPointerDown={(e) => dragControls.start(e)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      color: '#6B7280',
+                      cursor: 'grab',
+                      touchAction: 'none',
+                    }}
+                  >
+                    <GripIcon />
+                  </span>
+                </Tooltip>
                 <button
                   type="button"
                   onClick={() => setExpanded(true)}
@@ -1223,6 +1230,7 @@ function ScenePicker({ registry }: { registry: Registry }) {
 
   return (
     <div style={{ position: 'relative' }}>
+      <Tooltip label="Pick which animation Loupe is controlling">
       <button
         ref={buttonRef}
         type="button"
@@ -1242,13 +1250,13 @@ function ScenePicker({ registry }: { registry: Registry }) {
           cursor: 'pointer',
           letterSpacing: 0.2,
         }}
-        title="Pick which animation Loupe is controlling"
       >
         <span>{active?.label ?? '— Pick a scene'}</span>
         <svg width="9" height="9" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 5l4 4 4-4" />
         </svg>
       </button>
+      </Tooltip>
       {open && menuPos &&
         typeof document !== 'undefined' &&
         createPortal(
@@ -1532,32 +1540,33 @@ function CompactSpeedChip({
   onChange: (s: number) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => {
-        const idx = SPEED_OPTIONS.indexOf(speed as (typeof SPEED_OPTIONS)[number]);
-        const next = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
-        onChange(next);
-      }}
-      title={`Speed: ${speed}× — tap to cycle`}
-      style={{
-        minWidth: 32,
-        height: 22,
-        padding: '0 8px',
-        borderRadius: 999,
-        border: 'none',
-        fontFamily: 'inherit',
-        fontWeight: 700,
-        fontSize: 11,
-        lineHeight: 1,
-        color: PANEL_HIGHLIGHT,
-        background: 'rgba(255, 255, 255, 0.08)',
-        cursor: 'pointer',
-        transition: 'background 150ms ease, color 150ms ease',
-      }}
-    >
-      {speed === 1 ? '1×' : `${speed}×`}
-    </button>
+    <Tooltip label={`Playback speed · click to cycle`}>
+      <button
+        type="button"
+        onClick={() => {
+          const idx = SPEED_OPTIONS.indexOf(speed as (typeof SPEED_OPTIONS)[number]);
+          const next = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+          onChange(next);
+        }}
+        style={{
+          minWidth: 32,
+          height: 22,
+          padding: '0 8px',
+          borderRadius: 999,
+          border: 'none',
+          fontFamily: 'inherit',
+          fontWeight: 700,
+          fontSize: 11,
+          lineHeight: 1,
+          color: PANEL_HIGHLIGHT,
+          background: 'rgba(255, 255, 255, 0.08)',
+          cursor: 'pointer',
+          transition: 'background 150ms ease, color 150ms ease',
+        }}
+      >
+        {speed === 1 ? '1×' : `${speed}×`}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -1565,12 +1574,14 @@ function IconButton({
   children,
   onClick,
   title,
+  shortcut,
   active = false,
   disabled = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   title: string;
+  shortcut?: string;
   active?: boolean;
   disabled?: boolean;
 }) {
@@ -1578,35 +1589,36 @@ function IconButton({
   const hoverBg = active ? ACCENT : 'rgba(255, 255, 255, 0.12)';
   const fg = active ? '#fff' : disabled ? '#4B5563' : PANEL_FG;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-label={title}
-      disabled={disabled}
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        width: 26,
-        height: 26,
-        borderRadius: 999,
-        border: 'none',
-        background: baseBg,
-        color: fg,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'background 150ms ease, color 150ms ease',
-        opacity: disabled ? 0.5 : 1,
-      }}
-      onMouseEnter={(e) => {
-        if (!disabled) (e.currentTarget as HTMLElement).style.background = hoverBg;
-      }}
-      onMouseLeave={(e) => {
-        if (!disabled) (e.currentTarget as HTMLElement).style.background = baseBg;
-      }}
-    >
-      {children}
-    </button>
+    <Tooltip label={title} shortcut={shortcut}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={title}
+        disabled={disabled}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 26,
+          height: 26,
+          borderRadius: 999,
+          border: 'none',
+          background: baseBg,
+          color: fg,
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          transition: 'background 150ms ease, color 150ms ease',
+          opacity: disabled ? 0.5 : 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled) (e.currentTarget as HTMLElement).style.background = hoverBg;
+        }}
+        onMouseLeave={(e) => {
+          if (!disabled) (e.currentTarget as HTMLElement).style.background = baseBg;
+        }}
+      >
+        {children}
+      </button>
+    </Tooltip>
   );
 }
 
@@ -1647,17 +1659,34 @@ function ExpandIcon() {
     </svg>
   );
 }
+/**
+ * The "Add feedback on element" entry point. Earlier this was a
+ * generic cursor/arrow shape, which read as "default cursor" and
+ * didn't communicate the actual action (pick a target on screen
+ * and add an annotation). New shape: a crosshair with a small plus
+ * overlay — universally legible as "pick a point and add something."
+ */
 function PointerIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 2l3.8 9.5 1.7-3.6 3.5-1.7L3 2z" />
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="6" cy="6" r="3.5" />
+      <path d="M6 1.5v1.5M6 9v1.5M1.5 6h1.5M9 6h1.5" />
+      <path d="M10 9.5v3M8.5 11h3" />
     </svg>
   );
 }
+/**
+ * Region / marquee-select tool. Earlier this was four corner-segment
+ * dashes which read as "broken rectangle" more than "marquee." New
+ * shape: a full dashed selection rectangle with a small solid square
+ * inside, the way Figma / Photoshop draw their marquee tools — the
+ * convention designers already carry from those apps.
+ */
 function RegionIcon() {
   return (
-    <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 2h3M9 2h3M2 12h3M9 12h3M2 5v4M12 5v4" strokeDasharray="1.5 1.5" />
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1.5" y="1.5" width="11" height="11" rx="1" strokeDasharray="1.6 1.6" />
+      <rect x="4.5" y="4.5" width="5" height="5" rx="0.5" fill="currentColor" stroke="none" opacity="0.85" />
     </svg>
   );
 }
@@ -1749,24 +1778,25 @@ function AnnotationList() {
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {annotations.length > 0 && (
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                onCopy();
-              }}
-              title="Copy all as markdown"
-              style={{
-                fontSize: 10,
-                fontWeight: 700,
-                color: copied ? '#86EFAC' : PANEL_HIGHLIGHT,
-                cursor: 'pointer',
-                background: copied ? 'rgba(34, 197, 94, 0.15)' : ACCENT,
-                padding: '2px 8px',
-                borderRadius: 999,
-              }}
-            >
-              {copied ? 'copied ✓' : 'copy feedback'}
-            </span>
+            <Tooltip label="Copy every annotation as a Markdown bullet list">
+              <span
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCopy();
+                }}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: copied ? '#86EFAC' : PANEL_HIGHLIGHT,
+                  cursor: 'pointer',
+                  background: copied ? 'rgba(34, 197, 94, 0.15)' : ACCENT,
+                  padding: '2px 8px',
+                  borderRadius: 999,
+                }}
+              >
+                {copied ? 'copied ✓' : 'copy feedback'}
+              </span>
+            </Tooltip>
           )}
           {annotations.length > 0 && (
             <span
@@ -1867,28 +1897,29 @@ function AnnotationList() {
                   {a.note}
                 </div>
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (confirm(`Delete annotation #${i + 1}?`)) deleteAnnotation(a.id);
-                }}
-                title="Delete"
-                style={{
-                  flexShrink: 0,
-                  width: 18,
-                  height: 18,
-                  borderRadius: 4,
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#6B7280',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: 12,
-                  lineHeight: 1,
-                }}
-              >
-                ×
-              </button>
+              <Tooltip label="Delete this annotation">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Delete annotation #${i + 1}?`)) deleteAnnotation(a.id);
+                  }}
+                  style={{
+                    flexShrink: 0,
+                    width: 18,
+                    height: 18,
+                    borderRadius: 4,
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#6B7280',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: 12,
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </Tooltip>
             </div>
           ))}
         </div>
