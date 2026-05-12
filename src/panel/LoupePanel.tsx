@@ -18,6 +18,8 @@ import { useLoupeRegistry } from '../runtime/registry';
 import { phaseAtTime, rangeOf } from '../runtime/phases';
 import { useAnnotations } from '../annotations/AnnotationsProvider';
 import { annotationsToMarkdown } from '../annotations/export';
+import { Welcome } from './Welcome';
+import { SampleScene, SAMPLE_SCENE_ID } from './SampleScene';
 
 /**
  * Loupe panel — the floating UI at app root, driven by the LoupeRegistry.
@@ -51,6 +53,7 @@ const PANEL_HIGHLIGHT = 'var(--loupe-panel-highlight, #EAF3FF)';
 
 export function LoupePanel() {
   const registry = useLoupeRegistry();
+  const [sampleActive, setSampleActive] = useState(false);
   const activeScene = registry.activeSceneId
     ? registry.scenes.find((s) => s.id === registry.activeSceneId)
     : undefined;
@@ -251,6 +254,20 @@ export function LoupePanel() {
     }
   };
 
+  // If the only registered scene is our built-in sample, treat the
+  // panel as still effectively empty for "Try the sample" button
+  // visibility logic. If the user wires up a real scene, sample
+  // auto-removes — no point keeping a teaching aid alongside real work.
+  const realSceneCount = registry.scenes.filter(
+    (s) => s.id !== SAMPLE_SCENE_ID,
+  ).length;
+  useEffect(() => {
+    if (sampleActive && realSceneCount > 0) setSampleActive(false);
+  }, [sampleActive, realSceneCount]);
+  const sampleNode = sampleActive ? (
+    <SampleScene onDismiss={() => setSampleActive(false)} />
+  ) : null;
+
   if (!activeScene) {
     // Two sub-states:
     //  - No scenes registered at all → static centered "no scene" pill
@@ -261,31 +278,26 @@ export function LoupePanel() {
     //    full panel so collapsing/expanding doesn't jump around.
     if (registry.scenes.length === 0) {
       return (
-        <motion.div
-          data-loupe-ui
-          className="pointer-events-none fixed left-1/2 -translate-x-1/2"
-          style={{ bottom: 16, zIndex: 10050, position: 'fixed', left: '50%', transform: 'translateX(-50%)' }}
-        >
-          <div
-            style={{
-              pointerEvents: 'auto',
-              padding: '8px 14px',
-              background: PANEL_BG,
-              borderRadius: 999,
-              color: PANEL_MUTED,
-              fontFamily: FONT,
-              fontSize: 11,
-              fontWeight: 600,
-              border: `1px solid ${PANEL_BORDER}`,
+        <>
+          <Welcome />
+          {sampleNode}
+          <EmptyPanel
+            onTrySample={() => {
+              setSampleActive(true);
+              // Pre-select the sample so when it registers the panel
+              // expands to drive it — beats any sticky "None" pick
+              // from a prior session.
+              registry.setActiveSceneId(SAMPLE_SCENE_ID);
             }}
-          >
-            Loupe — no scene registered
-          </div>
-        </motion.div>
+          />
+        </>
       );
     }
     return (
-      <CollapsedPanel
+      <>
+        <Welcome />
+        {sampleNode}
+        <CollapsedPanel
         registry={registry}
         dragControls={dragControls}
         x={x}
@@ -295,10 +307,14 @@ export function LoupePanel() {
         persistPosition={persistPosition}
         dragConstraints={constraints}
       />
+      </>
     );
   }
 
   return (
+    <>
+    <Welcome />
+    {sampleNode}
     <ActiveScenePanel
       registry={registry}
       activeScene={activeScene}
@@ -317,11 +333,234 @@ export function LoupePanel() {
       panelRef={panelRef}
       viewportW={viewport.w}
     />
+    </>
   );
 }
 
 type Registry = ReturnType<typeof useLoupeRegistry>;
 type ActiveScene = NonNullable<ReturnType<Registry['scenes']['find']>>;
+
+/**
+ * Empty-state panel — a skeleton/preview of the real ActiveScenePanel
+ * shown when no scenes are registered. Same shape, same controls,
+ * same rhythm — but all controls are inert and the scene picker
+ * dropdown exposes a single "Try the sample" option that mounts
+ * Loupe's built-in demo scene. The designer learns the panel's real
+ * mechanics in the empty state.
+ */
+function EmptyPanel({ onTrySample }: { onTrySample: () => void }) {
+  return (
+    <div
+      data-loupe-ui
+      style={{
+        position: 'fixed',
+        left: '50%',
+        bottom: 16,
+        transform: 'translateX(-50%)',
+        width: 'min(1024px, calc(100vw - 32px))',
+        zIndex: 10050,
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{
+          pointerEvents: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          width: '100%',
+          background: PANEL_BG,
+          backdropFilter: 'blur(14px)',
+          WebkitBackdropFilter: 'blur(14px)',
+          borderRadius: 16,
+          border: `1px solid ${PANEL_BORDER}`,
+          boxShadow:
+            '0 20px 40px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.25)',
+          color: PANEL_FG,
+          fontFamily: FONT,
+          padding: '12px 14px 14px',
+        }}
+      >
+        {/* Top row — picker, phase label, time, controls */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: 10,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '4px 2px',
+                color: '#6B7280',
+              }}
+              aria-hidden
+            >
+              <GripIcon />
+            </span>
+
+            <button
+              type="button"
+              onClick={onTrySample}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 999,
+                border: `1px solid ${PANEL_BORDER}`,
+                background: 'rgba(255, 255, 255, 0.04)',
+                color: PANEL_FG,
+                fontFamily: 'inherit',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+            >
+              <span style={{ color: PANEL_MUTED, fontWeight: 500 }}>Empty —</span>
+              <span style={{ color: ACCENT }}>try the sample</span>
+            </button>
+
+            <span
+              style={{
+                fontWeight: 700,
+                fontSize: 13,
+                letterSpacing: 0.2,
+                color: PANEL_MUTED,
+                opacity: 0.6,
+              }}
+            >
+              —
+            </span>
+            <span
+              style={{
+                fontWeight: 500,
+                fontSize: 11,
+                color: PANEL_MUTED,
+                fontVariantNumeric: 'tabular-nums',
+                opacity: 0.6,
+              }}
+            >
+              0ms / 0ms · 0%
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <DisabledIconButton title="Add feedback on element">
+              <PointerIcon />
+            </DisabledIconButton>
+            <DisabledIconButton title="Draw region">
+              <RegionIcon />
+            </DisabledIconButton>
+            <DisabledIconButton title="Annotations">
+              <EyeIcon />
+            </DisabledIconButton>
+            <span style={{ width: 1, height: 18, background: PANEL_BORDER, margin: '0 2px' }} />
+            <DisabledIconButton title="Play / pause">
+              <PlayIconShape />
+            </DisabledIconButton>
+            <DisabledIconButton title="Restart">
+              <RestartIconShape />
+            </DisabledIconButton>
+          </div>
+        </div>
+
+        {/* Inert scrubber */}
+        <div
+          aria-hidden
+          style={{
+            height: 6,
+            borderRadius: 999,
+            background: 'rgba(255, 255, 255, 0.06)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: '0%',
+              background: ACCENT,
+              opacity: 0.5,
+            }}
+          />
+        </div>
+
+        {/* Phase strip — single neutral band */}
+        <div style={{ marginTop: 8, display: 'flex', gap: 4, height: 22 }}>
+          <div
+            style={{
+              flex: 1,
+              borderRadius: 6,
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: `1px dashed ${PANEL_BORDER}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 10,
+              color: PANEL_MUTED,
+              letterSpacing: 0.3,
+            }}
+          >
+            no phases yet
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DisabledIconButton({
+  children,
+  title,
+}: {
+  children: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <span
+      title={title}
+      aria-disabled
+      style={{
+        width: 26,
+        height: 26,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 8,
+        background: 'rgba(255,255,255,0.04)',
+        color: PANEL_MUTED,
+        opacity: 0.55,
+        cursor: 'not-allowed',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function PlayIconShape() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 14 14" fill="currentColor">
+      <path d="M4 3l8 4-8 4z" />
+    </svg>
+  );
+}
+
+function RestartIconShape() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a4 4 0 1 1 1.2 2.8" />
+      <path d="M2 4v3h3" />
+    </svg>
+  );
+}
 
 /**
  * Compact, draggable pill shown when the user picks "None" from the
