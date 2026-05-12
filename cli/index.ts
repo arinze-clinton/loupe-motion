@@ -1,6 +1,7 @@
 import kleur from 'kleur';
 import { init } from './commands/init.js';
 import { scan } from './commands/scan.js';
+import { refactor } from './commands/refactor.js';
 import { check } from './commands/check.js';
 import { uninstall } from './commands/uninstall.js';
 import { LOUPE_VERSION } from './util.js';
@@ -20,6 +21,9 @@ async function main() {
       await scan({ cwd: process.cwd(), json });
       break;
     }
+    case 'refactor':
+      await refactor({ cwd: process.cwd() });
+      break;
     case 'check':
     case 'status':
       await check({
@@ -58,6 +62,7 @@ ${kleur.bold('Usage')}
   loupe ${kleur.cyan('init')}            Wire Loupe into your project + install the Claude skill
   loupe ${kleur.cyan('init --upgrade-demo')}  Rewrite a generated loupe-demo-scene.tsx to the latest template (with backup)
   loupe ${kleur.cyan('scan')} [--json]   Report which animations are timeline-bound
+  loupe ${kleur.cyan('refactor')}        Interactive walk-through to make animations scrubbable (no AI needed)
   loupe ${kleur.cyan('check')}           Show installed version + check for updates
   loupe ${kleur.cyan('uninstall')}       Remove Loupe cleanly (dep + generated files)
   loupe ${kleur.cyan('--version')}       Print version
