@@ -1,4 +1,6 @@
 import {
+  AnnotationOverlay,
+  AnnotationPins,
   AnnotationsProvider,
   LoupePanel,
   LoupeRegistryProvider,
@@ -38,6 +40,8 @@ export function App() {
           </div>
         </main>
         <LoupePanel />
+        <AnnotationOverlay />
+        <AnnotationPins />
       </AnnotationsProvider>
     </LoupeRegistryProvider>
   );
