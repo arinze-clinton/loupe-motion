@@ -1,4 +1,10 @@
-import { AnimatePresence, motion, useMotionValue, useTransform } from 'framer-motion';
+import {
+  AnimatePresence,
+  cubicBezier,
+  motion,
+  useMotionValue,
+  useTransform,
+} from 'framer-motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useOptionalLoupeRegistry } from '../runtime/registry';
@@ -203,9 +209,9 @@ function SlideOne() {
   return (
     <div>
       <Eyebrow>Welcome</Eyebrow>
-      <h1 style={titleStyle}>Loupe gives your animations a clock.</h1>
+      <h1 style={titleStyle}>Your web animations, on a timeline.</h1>
       <p style={bodyStyle}>
-        Scrub them like a video. Pause on any frame. Mark what's off,
+        Scrub like a video. Pause on any frame. Mark what's off,
         export the notes — all on real running code, not a recording.
       </p>
     </div>
@@ -216,10 +222,10 @@ function SlideTwo() {
   return (
     <div>
       <Eyebrow>Try it</Eyebrow>
-      <h1 style={titleStyle}>Here's one running right now.</h1>
+      <h1 style={titleStyle}>This one's real. Drag it.</h1>
       <p style={bodyStyle}>
-        Drag the scrubber. That's a real animation — every frame is
-        reproducible because Loupe owns the clock.
+        Scrub through to see every frame — and yes, you can leave notes
+        like the one pinned on the card. Same flow with your own work.
       </p>
       <DemoScrubber />
     </div>
@@ -229,24 +235,23 @@ function SlideTwo() {
 function SlideThree() {
   return (
     <div>
-      <Eyebrow>Last thing</Eyebrow>
-      <h1 style={titleStyle}>Make your own animations scrubbable.</h1>
+      <Eyebrow>Now make yours scrubbable</Eyebrow>
+      <h1 style={titleStyle}>Two ways in.</h1>
 
       <div style={pathBlockStyle}>
-        <div style={pathLabelStyle}>With an AI assistant</div>
+        <div style={pathLabelStyle}>With Claude, Cursor, or Copilot</div>
         <p style={pathBodyStyle}>
-          Run <Code>loupe scan</Code> in your terminal. Your assistant
-          (Claude, Cursor, Copilot) will find every animation and walk
-          you through making them scrubbable, one at a time.
+          Run <Code>loupe scan</Code>. Your assistant finds every
+          animation in your project and walks you through, one at
+          a time.
         </p>
       </div>
 
       <div style={pathBlockStyle}>
-        <div style={pathLabelStyle}>Without one</div>
+        <div style={pathLabelStyle}>No AI? No problem.</div>
         <p style={pathBodyStyle}>
-          Run <Code>loupe refactor</Code>. Loupe walks you through each
-          animation itself — shows the before, shows the after, asks
-          before changing anything.
+          Run <Code>loupe refactor</Code>. Loupe shows you each one — the
+          before, the after — and asks before changing anything.
         </p>
       </div>
 
@@ -257,12 +262,53 @@ function SlideThree() {
   );
 }
 
+// Phase ranges for the empty-state illustration scene. Sourced from
+// the Figma node 619:145736. Two discrete designer-tweakable moments:
+// the paper slide and the cross trim-path draw.
+const PHASES = [
+  { id: 'slide', label: 'slide', start: 0, end: 500 },
+  { id: 'draw', label: 'draw', start: 500, end: 1500 },
+] as const;
+
+function activePhase(timeMs: number): (typeof PHASES)[number] {
+  for (const p of PHASES) {
+    if (timeMs >= p.start && timeMs < p.end) return p;
+  }
+  return PHASES[PHASES.length - 1];
+}
+
+// Strong ease-out from Emil's design-eng playbook — the built-in
+// CSS easings feel flat; this curve gives entering motion punch and
+// a proper settle at the end. Same curve used across every entering
+// transform so the cascade reads as one breath.
+const EASE_OUT = cubicBezier(0.23, 1, 0.32, 1);
+
 function DemoScrubber() {
   const [paused, setPaused] = useState(false);
   const time = useMotionValue(0);
-  const opacity = useTransform(time, [0, 600], [0, 1], { clamp: true });
-  const scale = useTransform(time, [0, 600, 1200], [0.92, 1.02, 1], { clamp: true });
-  const lift = useTransform(time, [0, 600], [12, 0], { clamp: true });
+
+  // Paper — slides up from below the frame. Ease-out makes it land,
+  // not stop. y goes from "fully below frame" to "resting at top 37".
+  // Everything inside the paper (blue circle, text lines) rides along
+  // as part of the paper; they're not animated independently anymore.
+  const paperY = useTransform(time, [0, 500], [120, 0], {
+    clamp: true,
+    ease: EASE_OUT,
+  });
+
+  // Cross — starts drawing while the paper is still mid-slide so the
+  // motion stays continuous. crossOpacity fades in over the first
+  // ~150ms of the draw window — long enough for pathLength to have
+  // visible length, so the round linecaps don't render as dots.
+  const crossPathLength = useTransform(time, [400, 1100], [0, 1], {
+    clamp: true,
+    ease: EASE_OUT,
+  });
+  const crossOpacity = useTransform(time, [400, 550], [0, 1], {
+    clamp: true,
+    ease: EASE_OUT,
+  });
+
   const [scrubbing, setScrubbing] = useState(false);
   const rafRef = useRef<number | null>(null);
   const lastRef = useRef<number | null>(null);
@@ -297,84 +343,369 @@ function DemoScrubber() {
   const progress = time.get() / DEMO_DURATION_MS;
 
   return (
-    <div style={{ marginTop: 20 }}>
+    <div
+      style={{
+        marginTop: 20,
+        borderRadius: 12,
+        overflow: 'hidden',
+        background: '#0E0F12',
+        border: `1px solid ${PANEL_BORDER}`,
+        boxShadow: '0 12px 36px rgba(0,0,0,0.35)',
+      }}
+    >
+      {/* Mock browser chrome — anchors the demo as "a product on a page" */}
       <div
         style={{
-          height: 120,
-          borderRadius: 12,
-          background: 'rgba(255, 255, 255, 0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          padding: '8px 10px',
+          background: '#15171B',
+          borderBottom: `1px solid ${PANEL_BORDER}`,
+        }}
+        aria-hidden
+      >
+        <span style={{ width: 8, height: 8, borderRadius: 999, background: '#FF5F57' }} />
+        <span style={{ width: 8, height: 8, borderRadius: 999, background: '#FEBC2E' }} />
+        <span style={{ width: 8, height: 8, borderRadius: 999, background: '#28C840' }} />
+        <span
+          style={{
+            flex: 1,
+            marginLeft: 8,
+            padding: '3px 10px',
+            borderRadius: 6,
+            background: 'rgba(255,255,255,0.04)',
+            color: 'rgba(255,255,255,0.35)',
+            fontSize: 10,
+            fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace',
+          }}
+        >
+          loupe.dev/preview
+        </span>
+      </div>
+
+      {/* Mock app content — a small interface fragment with one element
+          animating in. The pin sits on the animated element so the
+          "target + annotate" idea reads as a single thought. */}
+      <div
+        style={{
+          position: 'relative',
+          padding: '24px 20px',
+          minHeight: 156,
+          background:
+            'radial-gradient(120% 80% at 50% 0%, rgba(58,151,249,0.06), rgba(0,0,0,0))',
+        }}
+      >
+        {/* Fixed annotation — pin + note popup live OUTSIDE the
+            animated scene so they don't move during scrubbing. */}
+        <DemoAnnotation />
+
+        {/* Centered illustration scene. The gradient circle is the
+            frame; the paper (SVG, pulled exactly from Figma node
+            619:145736) slides up from below and clips to the frame. */}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingTop: 16,
+            paddingBottom: 8,
+          }}
+        >
+          <div style={{ position: 'relative', width: 150, height: 150 }}>
+            {/* Frame background — gradient circle, overflow:hidden
+                so the paper is clipped while sliding up from below. */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(180deg, #E3ECFA 0%, #DAE7FF 100%)',
+                borderRadius: 9999,
+                overflow: 'hidden',
+              }}
+            >
+              {/* Paper group — translated upward into view during
+                  'slide'. Positioned at (30, 37) inside the 150x150
+                  frame, exactly as in Figma. */}
+              <motion.svg
+                viewBox="0 0 90 113"
+                width={90}
+                height={113}
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                style={{
+                  position: 'absolute',
+                  left: 30,
+                  top: 37,
+                  y: paperY,
+                }}
+              >
+                {/* Paper white shape — Subtraction 1 (Figma) */}
+                <path
+                  d="M90 111C90 112.105 89.1046 113 88 113H2C0.89543 113 0 112.105 0 111V17.9978C0 16.8941 0.897541 16.0119 1.99251 15.8734C5.49952 15.4298 8.78245 13.8345 11.3084 11.3085C13.8344 8.78247 15.4298 5.49952 15.8734 1.99251C16.0119 0.897542 16.8941 0 17.9978 0H71.9957C73.102 0 73.9851 0.901504 74.1219 1.99925C74.2982 3.41388 74.6644 4.80141 75.213 6.12378C76.0182 8.06478 77.2003 9.82685 78.691 11.308C80.1721 12.7991 81.9342 13.9816 83.8754 14.787C85.198 15.3357 86.5857 15.7019 88.0006 15.8782C89.0984 16.0149 90 16.8981 90 18.0044V111Z"
+                  fill="white"
+                />
+
+                {/* Blue circle — Ellipse 665 (Figma). Static — rides
+                    along with the paper as part of its content. */}
+                <path
+                  d="M45 65C58.2548 65 69 54.2548 69 41C69 27.7452 58.2548 17 45 17C31.7452 17 21 27.7452 21 41C21 54.2548 31.7452 65 45 65Z"
+                  fill="#4285F4"
+                />
+
+                {/* Cross strokes — two diagonals drawn via pathLength.
+                    Split into two paths so they draw simultaneously
+                    rather than sequentially. */}
+                <motion.path
+                  d="M35.1186 31.1187L54.8814 50.8815"
+                  stroke="white"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                  style={{ pathLength: crossPathLength, opacity: crossOpacity }}
+                />
+                <motion.path
+                  d="M54.8814 31.1187L35.1186 50.8815"
+                  stroke="white"
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                  style={{ pathLength: crossPathLength, opacity: crossOpacity }}
+                />
+
+                {/* Rectangle 5617 — first text line. Static. */}
+                <path
+                  d="M58 71H32C30.3431 71 29 72.3431 29 74C29 75.6569 30.3431 77 32 77H58C59.6569 77 61 75.6569 61 74C61 72.3431 59.6569 71 58 71Z"
+                  fill="#DFEAFB"
+                />
+
+                {/* Rectangle 5618 — second text line. Static. */}
+                <path
+                  d="M67 83H23C21.3431 83 20 84.3431 20 86C20 87.6569 21.3431 89 23 89H67C68.6569 89 70 87.6569 70 86C70 84.3431 68.6569 83 67 83Z"
+                  fill="#DFEAFB"
+                />
+              </motion.svg>
+            </div>
+
+            {/* Selection highlight — surrounds the paper's bounding
+                rectangle (not the circular frame around it). Follows
+                the paper's y transform so it slides up with the paper
+                during the 'slide' phase, exactly like Loupe's real
+                picker overlay would when you select an animated DOM
+                element. Lives OUTSIDE the overflow:hidden frame so
+                the ring can extend past the gradient's edges if the
+                paper's bounds do. */}
+            <motion.div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                left: 30 - 3,
+                top: 37 - 3,
+                width: 90 + 6,
+                height: 113 + 6,
+                y: paperY,
+                borderRadius: 5,
+                border: `1.5px solid ${ACCENT}`,
+                boxShadow:
+                  '0 0 0 3px rgba(58, 151, 249, 0.14), 0 0 18px rgba(58, 151, 249, 0.22)',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Mini Loupe panel — interactive scrubber + phase strip. Shows
+          the three phases of the envelope scene so the reader sees
+          a real timeline structure, not just a slider. */}
+      <div
+        style={{
+          background: PANEL_BG,
+          borderTop: `1px solid ${PANEL_BORDER}`,
+          padding: '8px 10px 10px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 10,
+            color: PANEL_MUTED,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 999,
+              border: `1px solid ${PANEL_BORDER}`,
+              color: PANEL_FG,
+              fontWeight: 600,
+              fontSize: 10,
+            }}
+          >
+            Envelope
+          </span>
+          <span style={{ fontWeight: 700, color: PANEL_FG, letterSpacing: 0.2 }}>
+            {activePhase(time.get()).label}
+          </span>
+          <span>{Math.round(time.get())}ms / {DEMO_DURATION_MS}ms</span>
+          <span style={{ marginLeft: 'auto', color: PANEL_FG, fontWeight: 600 }}>
+            {Math.round(progress * 100)}%
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setPaused((p) => !p)}
+            aria-label={paused ? 'Play demo' : 'Pause demo'}
+            style={iconButtonStyle}
+          >
+            {paused ? '▶' : '❚❚'}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={DEMO_DURATION_MS}
+            value={time.get()}
+            onChange={(e) => {
+              time.set(Number(e.target.value));
+              setTick((n) => (n + 1) % 1024);
+            }}
+            onMouseDown={() => setScrubbing(true)}
+            onMouseUp={() => setScrubbing(false)}
+            onTouchStart={() => setScrubbing(true)}
+            onTouchEnd={() => setScrubbing(false)}
+            style={{
+              flex: 1,
+              accentColor: ACCENT,
+              cursor: 'pointer',
+            }}
+            aria-label="Demo scrubber"
+          />
+        </div>
+
+        {/* Phase strip — three segments sized to phase duration. The
+            active segment lights up, mirroring the real panel. */}
+        <div style={{ display: 'flex', gap: 3, height: 14 }}>
+          {PHASES.map((p) => {
+            const active = activePhase(time.get()).id === p.id;
+            const widthPct = ((p.end - p.start) / DEMO_DURATION_MS) * 100;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  time.set(p.start);
+                  setTick((n) => (n + 1) % 1024);
+                }}
+                style={{
+                  flex: `0 0 ${widthPct}%`,
+                  minWidth: 0,
+                  height: '100%',
+                  padding: 0,
+                  borderRadius: 3,
+                  border: 'none',
+                  background: active ? ACCENT : 'rgba(255,255,255,0.06)',
+                  color: active ? '#0B1220' : PANEL_MUTED,
+                  fontFamily: 'inherit',
+                  fontWeight: active ? 700 : 500,
+                  fontSize: 9,
+                  letterSpacing: 0.3,
+                  cursor: 'pointer',
+                  transition: 'background 150ms ease, color 150ms ease',
+                }}
+                aria-label={`Jump to ${p.label} phase`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Pre-placed annotation pin + note popup, positioned in fixed space
+ * inside the mock content area. They DO NOT animate with the card —
+ * an annotation is an observation about the animation, not part of
+ * it. Visual language mirrors Loupe's real annotation: white-bordered
+ * circular marker + dark panel-styled note popup with a header (the
+ * targeted element + phase) and the note body.
+ */
+function DemoAnnotation() {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 130,
+        right: 260,
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 8,
+        pointerEvents: 'none',
+        zIndex: 3,
+      }}
+    >
+      {/* Note popup — mirrors AnnotationPins.tsx styling */}
+      <div
+        style={{
+          background: 'rgba(18, 20, 25, 0.96)',
+          color: PANEL_FG,
           border: `1px solid ${PANEL_BORDER}`,
+          borderRadius: 10,
+          padding: '7px 10px',
+          fontSize: 11,
+          lineHeight: 1.4,
+          maxWidth: 200,
+          boxShadow: '0 12px 30px rgba(0,0,0,0.45)',
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 700,
+            color: '#EAF3FF',
+            marginBottom: 3,
+            fontSize: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+          }}
+        >
+          paper
+          <span style={{ fontWeight: 500, color: PANEL_MUTED }}>· slide</span>
+        </div>
+        <div style={{ fontWeight: 500 }}>
+          Let's make this feel like it settles, not just stops.
+        </div>
+      </div>
+
+      {/* Marker — matches the real AnnotationPins button (white border,
+          accent fill, white number) but scaled down to fit the modal. */}
+      <div
+        style={{
+          width: 22,
+          height: 22,
+          borderRadius: 999,
+          border: '2px solid #fff',
+          background: ACCENT,
+          color: '#fff',
+          fontSize: 11,
+          fontWeight: 700,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          overflow: 'hidden',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+          flexShrink: 0,
+          marginTop: 2,
         }}
       >
-        <motion.div
-          style={{
-            opacity,
-            scale,
-            y: lift,
-            width: 180,
-            padding: '14px 16px',
-            borderRadius: 10,
-            background:
-              'linear-gradient(180deg, rgba(58,151,249,0.16), rgba(58,151,249,0.04))',
-            border: `1px solid ${ACCENT}`,
-            color: PANEL_FG,
-            fontSize: 13,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 6,
-          }}
-        >
-          <div style={{ fontWeight: 600 }}>New message</div>
-          <div style={{ color: PANEL_MUTED, fontSize: 12 }}>
-            Arinze sent you a file.
-          </div>
-        </motion.div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-        <button
-          type="button"
-          onClick={() => setPaused((p) => !p)}
-          aria-label={paused ? 'Play demo' : 'Pause demo'}
-          style={iconButtonStyle}
-        >
-          {paused ? '▶' : '❚❚'}
-        </button>
-        <input
-          type="range"
-          min={0}
-          max={DEMO_DURATION_MS}
-          value={time.get()}
-          onChange={(e) => {
-            time.set(Number(e.target.value));
-            setTick((n) => (n + 1) % 1024);
-          }}
-          onMouseDown={() => setScrubbing(true)}
-          onMouseUp={() => setScrubbing(false)}
-          onTouchStart={() => setScrubbing(true)}
-          onTouchEnd={() => setScrubbing(false)}
-          style={{
-            flex: 1,
-            accentColor: ACCENT,
-            cursor: 'pointer',
-          }}
-          aria-label="Demo scrubber"
-        />
-        <span
-          style={{
-            fontSize: 11,
-            color: PANEL_MUTED,
-            fontVariantNumeric: 'tabular-nums',
-            minWidth: 42,
-            textAlign: 'right',
-          }}
-        >
-          {Math.round(progress * 100)}%
-        </span>
+        1
       </div>
     </div>
   );
