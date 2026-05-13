@@ -2,6 +2,7 @@
   "name": "@arinze-clinton/loupe",
   "version": "0.3.0",
   "description": "Timeline-first motion authoring tool — scrub, annotate, and review React animations against a deterministic timeline.",
+  "author": "Arinze Clinton",
   "license": "SEE LICENSE IN LICENSE",
   "private": false,
   "type": "module",
