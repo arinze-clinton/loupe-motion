@@ -103,3 +103,17 @@ Click the pointer icon in the Loupe panel → click any element on the page → 
 - See [the timeline-first pitch](timeline-first.md) for why this pattern matters.
 - See [refactoring fire-and-forget animations](refactoring-to-timeline.md) if you have existing animations to migrate.
 - See [API reference](api.md) for every export Loupe ships.
+
+## Common issues
+
+**"npm error Cannot read properties of null (reading 'matches')"**
+Your project uses a different package manager than `npm` — usually pnpm. Check for `pnpm-lock.yaml` / `yarn.lock` / `bun.lockb` at the project root and use the matching install command (`pnpm add @arinze-clinton/loupe -D` / `yarn add @arinze-clinton/loupe -D` / `bun add @arinze-clinton/loupe -D`).
+
+**"Unknown command: check" (or `uninstall`, `refactor`)**
+You're hitting a cached older version. Force the latest:
+
+```bash
+npx @arinze-clinton/loupe@latest --version
+```
+
+If that still shows an old version, clear npx's cache (`rm -rf ~/.npm/_npx`) and try again.
