@@ -71,17 +71,17 @@ function effectiveOpacity(el: Element): number {
  * bounding rect contains (x, y) and which is visible. Used as a fallback
  * when `elementFromPoint` is defeated by a `pointer-events: none` ancestor.
  */
-function manualHitTest(root: HTMLElement, x: number, y: number): HTMLElement | null {
+function manualHitTest(root: Element, x: number, y: number): Element | null {
   const rootRect = root.getBoundingClientRect();
   if (x < rootRect.left || x > rootRect.right || y < rootRect.top || y > rootRect.bottom) {
     return null;
   }
-  let best: HTMLElement | null = root;
+  let best: Element | null = root;
   let bestArea = rootRect.width * rootRect.height;
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
   let node: Node | null = walker.currentNode;
   while ((node = walker.nextNode())) {
-    if (!(node instanceof HTMLElement)) continue;
+    if (!(node instanceof Element)) continue;
     if (node.closest('[data-loupe-ui]')) continue;
     const rect = node.getBoundingClientRect();
     if (rect.width === 0 || rect.height === 0) continue;
@@ -111,14 +111,17 @@ function ElementPicker({
   onPick,
   onCancel,
 }: {
-  onPick: (el: HTMLElement) => void;
+  onPick: (el: Element) => void;
   onCancel: () => void;
 }) {
-  const [hovered, setHovered] = useState<HTMLElement | null>(null);
+  const [hovered, setHovered] = useState<Element | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const registry = useOptionalLoupeRegistry();
 
-  const resolveTarget = (clientX: number, clientY: number): HTMLElement | null => {
+  // Returns `Element`, not `HTMLElement`. SVG paths/circles/text inside
+  // animated scenes inherit from `Element` only — narrowing the return type
+  // drops every SVG hit and breaks picking on the most common use case.
+  const resolveTarget = (clientX: number, clientY: number): Element | null => {
     const overlay = overlayRef.current;
     if (overlay) overlay.style.pointerEvents = 'none';
     // Walk the full hit-stack instead of grabbing only the topmost element.
@@ -133,23 +136,23 @@ function ElementPicker({
 
     // Collect every registered scene root so we can both filter by it and
     // fall back to manual hit-testing when elementFromPoint is defeated.
-    const sceneRoots: HTMLElement[] = [];
+    const sceneRoots: Element[] = [];
     if (registry) {
       for (const scene of registry.scenes) {
         const el = scene.rootRef.current;
-        if (el instanceof HTMLElement) sceneRoots.push(el);
+        if (el instanceof Element) sceneRoots.push(el);
       }
     }
     // Also pick up SceneRoot markers that aren't in the registry yet.
     document.querySelectorAll('[data-loupe-scene-root]').forEach((el) => {
-      if (el instanceof HTMLElement && !sceneRoots.includes(el)) sceneRoots.push(el);
+      if (el instanceof Element && !sceneRoots.includes(el)) sceneRoots.push(el);
     });
 
-    const inAnySceneRoot = (el: HTMLElement): boolean =>
+    const inAnySceneRoot = (el: Element): boolean =>
       sceneRoots.length === 0 || sceneRoots.some((root) => root.contains(el));
 
     for (const candidate of stack) {
-      if (!(candidate instanceof HTMLElement)) continue;
+      if (!(candidate instanceof Element)) continue;
       if (candidate.closest('[data-loupe-ui]')) continue;
       if (effectiveOpacity(candidate) < VISIBILITY_THRESHOLD) continue;
       if (!inAnySceneRoot(candidate)) continue;
@@ -206,7 +209,7 @@ function ElementPicker({
   );
 }
 
-function HighlightBox({ el }: { el: HTMLElement }) {
+function HighlightBox({ el }: { el: Element }) {
   const [rect, setRect] = useState<DOMRect | null>(() => el.getBoundingClientRect());
   useEffect(() => {
     let raf = 0;
@@ -498,7 +501,7 @@ function DraftEditor() {
   );
 }
 
-function DraftOutline({ el }: { el: HTMLElement }) {
+function DraftOutline({ el }: { el: Element }) {
   const [rect, setRect] = useState<DOMRect>(() => el.getBoundingClientRect());
   useEffect(() => {
     let raf = 0;

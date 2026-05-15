@@ -56,7 +56,7 @@ export type Annotation = {
 export type AnnotationDraft =
   | {
       kind: 'element';
-      element: HTMLElement;
+      element: Element;
       snapshot: Omit<Annotation, 'note' | 'id' | 'createdAt' | 'color'>;
     }
   | {

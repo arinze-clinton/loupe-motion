@@ -26,7 +26,7 @@ export type FiberInfo = {
   sourceLocation?: string;
 };
 
-export function fiberInfo(el: HTMLElement | null): FiberInfo {
+export function fiberInfo(el: Element | null): FiberInfo {
   if (!el) return {};
   const fiber = getFiber(el);
   if (!fiber) return {};
@@ -45,7 +45,7 @@ export function fiberInfo(el: HTMLElement | null): FiberInfo {
   return { componentName, sourceLocation };
 }
 
-function getFiber(el: HTMLElement): FiberNode | undefined {
+function getFiber(el: Element): FiberNode | undefined {
   const key = Object.keys(el).find(
     (k) => k.startsWith('__reactFiber$') || k.startsWith('__reactInternalInstance$'),
   );

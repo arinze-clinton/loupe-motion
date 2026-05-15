@@ -1,16 +1,14 @@
-import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { TimelineProvider } from '../runtime/TimelineProvider';
-import { useTimelineValue } from '../runtime/hooks';
+import { useTimeline } from '../runtime/TimelineProvider';
 import { useSceneRootRef } from '../runtime/registry';
+import { PaperScene, PAPER_SCENE_PHASES, PAPER_SCENE_DURATION_MS } from '../scenes/PaperScene';
 
 /**
  * A built-in demo scene Loupe can mount from the empty-panel state's
- * "Try the sample" button. Gives the designer a real, live scene to
- * drive without having to wire one up in their own app first.
- *
- * Visually: a small labeled card portaled into a top-center floating
- * region, so it doesn't disturb the user's content underneath.
+ * "Try the sample" button. Uses the SAME paper-slide animation the
+ * onboarding modal shows — so what the user just watched is exactly
+ * the thing they get to scrub, pick, and annotate.
  */
 
 const ACCENT = 'var(--loupe-accent, #3A97F9)';
@@ -22,53 +20,93 @@ const FONT = 'var(--loupe-font, system-ui, -apple-system, sans-serif)';
 
 export const SAMPLE_SCENE_ID = 'loupe:sample';
 
+const SAMPLE_PHASE_DURATIONS = PAPER_SCENE_PHASES.reduce<Record<string, number>>(
+  (acc, p) => {
+    acc[p.id] = p.end - p.start;
+    return acc;
+  },
+  {},
+);
+const SAMPLE_PHASE_LABELS = PAPER_SCENE_PHASES.reduce<Record<string, string>>(
+  (acc, p) => {
+    acc[p.id] = p.label;
+    return acc;
+  },
+  {},
+);
+const SAMPLE_PHASE_ORDER = PAPER_SCENE_PHASES.map((p) => p.id);
+
 export function SampleScene({ onDismiss }: { onDismiss: () => void }) {
   if (typeof document === 'undefined') return null;
 
-  return createPortal(
-    <div
-      data-loupe-ui
-      style={{
-        position: 'fixed',
-        top: 32,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        zIndex: 10040,
-        pointerEvents: 'none',
-        fontFamily: FONT,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 8,
-      }}
-    >
-      <SampleControlChip onDismiss={onDismiss} />
-      <TimelineProvider
-        config={{
-          id: SAMPLE_SCENE_ID,
-          label: 'Sample scene',
-          phaseOrder: ['enter', 'settle', 'rest'],
-          phaseDurations: { enter: 600, settle: 600, rest: 400 },
-          phaseLabels: { enter: 'Enter', settle: 'Settle', rest: 'Rest' },
-        }}
-      >
-        <SampleCard />
-      </TimelineProvider>
-    </div>,
-    document.body,
+  return (
+    <>
+      {createPortal(
+        <div
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            // Sits BELOW the picker overlay (z 9998) so the overlay
+            // can intercept hover/click for picking the sample card's
+            // pieces. Still above page content.
+            zIndex: 9500,
+            pointerEvents: 'none',
+            fontFamily: FONT,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <TimelineProvider
+            config={{
+              id: SAMPLE_SCENE_ID,
+              label: 'Sample · Paper slide',
+              phaseOrder: SAMPLE_PHASE_ORDER,
+              phaseDurations: SAMPLE_PHASE_DURATIONS,
+              phaseLabels: SAMPLE_PHASE_LABELS,
+            }}
+          >
+            <SampleCard />
+          </TimelineProvider>
+        </div>,
+        document.body,
+      )}
+      {/* Stop chip lives in its OWN portal so it can sit ABOVE the
+          picker overlay (z 9998). It's tagged data-loupe-ui so the
+          picker still skips it — the chip can't be picked, but it
+          remains clickable mid-pick. */}
+      {createPortal(
+        <SampleControlChip onDismiss={onDismiss} />,
+        document.body,
+      )}
+    </>
   );
 }
 
 /**
- * Small Loupe-branded pill that sits above the sample card. It's
- * visually tethered to the card (proximity), wears Loupe colours
- * (continuity), and uses the word "Stop" rather than an × icon
- * (so it can't be mistaken for a notification-dismiss control).
+ * The chip + Stop button are Loupe's own chrome — tag them with
+ * `data-loupe-ui` so the picker skips them. The sample card itself
+ * stays untagged so designers can pick the paper, circle, and cross.
  */
 function SampleControlChip({ onDismiss }: { onDismiss: () => void }) {
   return (
     <div
+      data-loupe-ui
       style={{
+        // Positioned just below the centered card. Roughly: viewport
+        // midpoint + half-card-height + gap. The exact pixel doesn't
+        // matter — visual alignment with the card is what reads.
+        position: 'fixed',
+        top: 'calc(50% + 130px)',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        // Above the picker overlay (9998) so Stop stays clickable
+        // mid-pick. The chip is tagged data-loupe-ui so the picker
+        // still excludes it from element resolution.
+        zIndex: 10050,
         pointerEvents: 'auto',
         display: 'inline-flex',
         alignItems: 'center',
@@ -121,28 +159,26 @@ function SampleControlChip({ onDismiss }: { onDismiss: () => void }) {
 
 function SampleCard() {
   const ref = useSceneRootRef();
-  const opacity = useTimelineValue(0, 1, { phase: 'enter' });
-  const y = useTimelineValue(20, 0, { phase: 'enter' });
-  const scale = useTimelineValue(0.94, 1, { phase: 'enter' });
+  const { time } = useTimeline();
 
   return (
-    <motion.div
+    <div
       ref={ref as React.Ref<HTMLDivElement>}
       style={{
-        opacity,
-        y,
-        scale,
+        // Card opts back into hit-testing so the picker can find
+        // descendants. The registry also auto-patches this to `auto`
+        // on registration as a safety net.
         pointerEvents: 'auto',
-        width: 280,
-        padding: '14px 16px',
-        borderRadius: 14,
+        padding: 16,
+        borderRadius: 18,
         background: PANEL_BG,
         color: PANEL_FG,
         border: `1px solid ${PANEL_BORDER}`,
         boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
         display: 'flex',
         flexDirection: 'column',
-        gap: 6,
+        alignItems: 'center',
+        gap: 10,
         position: 'relative',
       }}
     >
@@ -153,14 +189,15 @@ function SampleCard() {
           letterSpacing: '0.1em',
           color: ACCENT,
           fontWeight: 700,
+          alignSelf: 'flex-start',
         }}
       >
-        Sample · Loupe
+        Sample · Paper slide
       </div>
-      <div style={{ fontSize: 14, fontWeight: 600 }}>New message</div>
-      <div style={{ fontSize: 12, color: PANEL_MUTED }}>
-        Drag the scrubber to scrub me.
+      <PaperScene time={time} />
+      <div style={{ fontSize: 12, color: PANEL_MUTED, alignSelf: 'flex-start' }}>
+        Scrub the timeline · pick the paper, circle, or cross.
       </div>
-    </motion.div>
+    </div>
   );
 }

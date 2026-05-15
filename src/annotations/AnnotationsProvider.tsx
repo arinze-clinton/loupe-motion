@@ -32,7 +32,14 @@ type AnnotationsState = {
 
   setVisible: (v: boolean) => void;
   setPickerMode: (m: PickerMode) => void;
-  pickElement: (el: HTMLElement) => void;
+  /**
+   * Accepts any DOM `Element`, NOT `HTMLElement`. SVG nodes (paper paths,
+   * circles, cross strokes inside an animated `<svg>`) inherit from
+   * `Element` only — tightening this to `HTMLElement` silently drops every
+   * SVG pick and was the original bug behind "I can't select the paper."
+   * Regression covered in `AnnotationsProvider.test.tsx`.
+   */
+  pickElement: (el: Element) => void;
   pickRegion: (region: { x: number; y: number; w: number; h: number }) => void;
   commitDraft: (note: string) => void;
   cancelDraft: () => void;
@@ -131,7 +138,7 @@ export function AnnotationsProvider({ children }: { children: React.ReactNode })
   }, [activeScene]);
 
   const pickElement = useCallback(
-    (el: HTMLElement) => {
+    (el: Element) => {
       const info = fiberInfo(el);
       const tl = snapshotForActive();
       setDraft({

@@ -4,6 +4,7 @@ import {
   AnnotationsProvider,
   LoupePanel,
   LoupeRegistryProvider,
+  useLoupeRegistry,
 } from '@arinze-clinton/loupe';
 
 /**
@@ -19,30 +20,44 @@ export function App() {
   return (
     <LoupeRegistryProvider>
       <AnnotationsProvider>
-        <main
-          style={{
-            minHeight: '100%',
-            padding: 48,
-            display: 'grid',
-            placeItems: 'center',
-            color: '#9BA3AF',
-            fontFamily: 'system-ui, -apple-system, sans-serif',
-          }}
-        >
-          <div style={{ textAlign: 'center', maxWidth: 420 }}>
-            <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 8 }}>
-              your app
-            </div>
-            <div style={{ fontSize: 15, lineHeight: 1.5 }}>
-              Imagine this is your React app. Loupe is installed, but no
-              animations are wired up yet.
-            </div>
-          </div>
-        </main>
+        <Placeholder />
         <LoupePanel />
         <AnnotationOverlay />
         <AnnotationPins />
       </AnnotationsProvider>
     </LoupeRegistryProvider>
+  );
+}
+
+/**
+ * "your app" empty-state copy. Hidden while the built-in sample is
+ * running so the sample animation takes the center of the screen
+ * unobstructed — same mental model as the onboarding demo.
+ */
+function Placeholder() {
+  const { scenes } = useLoupeRegistry();
+  const sampleActive = scenes.some((s) => s.id === 'loupe:sample');
+  if (sampleActive) return null;
+  return (
+    <main
+      style={{
+        minHeight: '100%',
+        padding: 48,
+        display: 'grid',
+        placeItems: 'center',
+        color: '#9BA3AF',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+      }}
+    >
+      <div style={{ textAlign: 'center', maxWidth: 420 }}>
+        <div style={{ fontSize: 13, opacity: 0.6, marginBottom: 8 }}>
+          your app
+        </div>
+        <div style={{ fontSize: 15, lineHeight: 1.5 }}>
+          Imagine this is your React app. Loupe is installed, but no
+          animations are wired up yet.
+        </div>
+      </div>
+    </main>
   );
 }
