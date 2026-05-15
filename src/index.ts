@@ -25,10 +25,12 @@ export {
   useOptionalLoupeRegistry,
   useRegisterSceneWithLoupe,
   useSceneRootRef,
+  useOptionalSceneRootRef,
   type ExternalScene,
   type RegisteredScene,
   type RegisteredTimeline,
 } from './runtime/registry';
+export { SceneRoot, SCENE_ROOT_ATTR } from './runtime/SceneRoot';
 
 // Panel — the floating dev UI.
 export { LoupePanel } from './panel/LoupePanel';

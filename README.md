@@ -88,6 +88,22 @@ Once a scene is wrapped in `<TimelineProvider>`, every animated value reads from
 | `loupe check` | Print the version installed, what's declared in `package.json`, and the latest on npm. |
 | `loupe uninstall` | Remove `@arinze-clinton/loupe` and the files `loupe init` wrote. Won't touch files you've edited. |
 
+## Why my scene isn't pickable
+
+If hovering over your animation highlights the page behind it (not the scene itself), a `pointer-events: none` ancestor is making the scene invisible to `document.elementFromPoint`. Common in production code that wraps autoplaying vignettes so they don't intercept page clicks.
+
+Wrap the scene in `<SceneRoot>` instead of a bare `<div>`:
+
+```tsx
+import { SceneRoot } from '@arinze-clinton/loupe';
+
+<SceneRoot>
+  {/* your animated content */}
+</SceneRoot>
+```
+
+`<SceneRoot>` flips to `pointer-events: auto` whenever Loupe is mounted and back to `none` in production builds where it isn't. You get pickable scenes in the workbench and click-through behavior in prod, without remembering the rule.
+
 ## Requirements
 
 - React 18+

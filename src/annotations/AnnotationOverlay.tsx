@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAnnotations } from './AnnotationsProvider';
+import { useOptionalLoupeRegistry } from '../runtime/registry';
 import { elementToSelector } from './selector';
 import { fiberInfo } from './fiber';
 
@@ -65,6 +66,47 @@ function effectiveOpacity(el: Element): number {
   return opacity;
 }
 
+/**
+ * Walk a scene root's descendants and find the deepest element whose
+ * bounding rect contains (x, y) and which is visible. Used as a fallback
+ * when `elementFromPoint` is defeated by a `pointer-events: none` ancestor.
+ */
+function manualHitTest(root: HTMLElement, x: number, y: number): HTMLElement | null {
+  const rootRect = root.getBoundingClientRect();
+  if (x < rootRect.left || x > rootRect.right || y < rootRect.top || y > rootRect.bottom) {
+    return null;
+  }
+  let best: HTMLElement | null = root;
+  let bestArea = rootRect.width * rootRect.height;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  let node: Node | null = walker.currentNode;
+  while ((node = walker.nextNode())) {
+    if (!(node instanceof HTMLElement)) continue;
+    if (node.closest('[data-loupe-ui]')) continue;
+    const rect = node.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue;
+    if (effectiveOpacity(node) < VISIBILITY_THRESHOLD) continue;
+    const area = rect.width * rect.height;
+    // Prefer the smallest (deepest) hit — same heuristic the browser uses.
+    if (area <= bestArea) {
+      best = node;
+      bestArea = area;
+    }
+  }
+  return best;
+}
+
+let pickerDefeatedWarned = false;
+function warnPickerDefeated() {
+  if (pickerDefeatedWarned) return;
+  pickerDefeatedWarned = true;
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[Loupe] Element picker hit a non-scene element. A `pointer-events: none` ancestor is likely making your scenes invisible to the picker. If you\'re not using <SceneRoot>, switch to it, or set `pointer-events: auto` on the scene root in dev.',
+  );
+}
+
 function ElementPicker({
   onPick,
   onCancel,
@@ -74,6 +116,7 @@ function ElementPicker({
 }) {
   const [hovered, setHovered] = useState<HTMLElement | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const registry = useOptionalLoupeRegistry();
 
   const resolveTarget = (clientX: number, clientY: number): HTMLElement | null => {
     const overlay = overlayRef.current;
@@ -87,11 +130,43 @@ function ElementPicker({
     // can actually see.
     const stack = document.elementsFromPoint(clientX, clientY);
     if (overlay) overlay.style.pointerEvents = 'auto';
+
+    // Collect every registered scene root so we can both filter by it and
+    // fall back to manual hit-testing when elementFromPoint is defeated.
+    const sceneRoots: HTMLElement[] = [];
+    if (registry) {
+      for (const scene of registry.scenes) {
+        const el = scene.rootRef.current;
+        if (el instanceof HTMLElement) sceneRoots.push(el);
+      }
+    }
+    // Also pick up SceneRoot markers that aren't in the registry yet.
+    document.querySelectorAll('[data-loupe-scene-root]').forEach((el) => {
+      if (el instanceof HTMLElement && !sceneRoots.includes(el)) sceneRoots.push(el);
+    });
+
+    const inAnySceneRoot = (el: HTMLElement): boolean =>
+      sceneRoots.length === 0 || sceneRoots.some((root) => root.contains(el));
+
     for (const candidate of stack) {
       if (!(candidate instanceof HTMLElement)) continue;
       if (candidate.closest('[data-loupe-ui]')) continue;
       if (effectiveOpacity(candidate) < VISIBILITY_THRESHOLD) continue;
+      if (!inAnySceneRoot(candidate)) continue;
       return candidate;
+    }
+
+    // Fallback: nothing in the hit-stack belonged to a scene. Likely an
+    // ancestor has `pointer-events: none`. Manually rect-test the scene
+    // roots — slower, but correct.
+    if (sceneRoots.length > 0) {
+      warnPickerDefeated();
+      // Iterate in reverse DOM order so the most-recently-mounted scene
+      // (typically on top) wins ties.
+      for (let i = sceneRoots.length - 1; i >= 0; i--) {
+        const hit = manualHitTest(sceneRoots[i], clientX, clientY);
+        if (hit) return hit;
+      }
     }
     return null;
   };

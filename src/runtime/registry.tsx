@@ -172,6 +172,60 @@ export function LoupeRegistryProvider({
     setFlashTick((t) => t + 1);
   }, []);
 
+  /**
+   * Picker rescue: force `pointer-events: auto` on every registered
+   * scene's root element while Loupe is mounted. `document.elementFromPoint`
+   * sees through any ancestor with `pointer-events: none`, so a scene
+   * wrapped in (or nested under) a click-through container would be
+   * invisible to the picker. Patching here means every scene that goes
+   * through `TimelineProvider` or `useRegisterSceneWithLoupe` is rescued
+   * automatically — consumers don't have to remember the rule.
+   *
+   * We record the element's original inline `pointerEvents` value so we
+   * can restore it when the scene unregisters or the provider unmounts.
+   */
+  const patchedRef = useRef<Map<string, { el: HTMLElement; original: string }>>(
+    new Map(),
+  );
+  useEffect(() => {
+    const patched = patchedRef.current;
+    const liveIds = new Set(scenes.map((s) => s.id));
+
+    // Restore + drop entries for scenes that have gone away.
+    for (const [id, entry] of patched) {
+      if (!liveIds.has(id)) {
+        entry.el.style.pointerEvents = entry.original;
+        patched.delete(id);
+      }
+    }
+
+    // Patch any scene whose element is mounted and not yet patched.
+    for (const scene of scenes) {
+      const el = scene.rootRef.current;
+      if (!(el instanceof HTMLElement)) continue;
+      const existing = patched.get(scene.id);
+      if (existing && existing.el === el) continue;
+      // Element swapped (HMR, remount) — restore the old one before
+      // re-patching the new one.
+      if (existing && existing.el !== el) {
+        existing.el.style.pointerEvents = existing.original;
+      }
+      patched.set(scene.id, { el, original: el.style.pointerEvents });
+      el.style.pointerEvents = 'auto';
+    }
+  }, [scenes]);
+
+  useEffect(() => {
+    // Provider-unmount cleanup: restore every patched element.
+    const patched = patchedRef.current;
+    return () => {
+      for (const entry of patched.values()) {
+        entry.el.style.pointerEvents = entry.original;
+      }
+      patched.clear();
+    };
+  }, []);
+
   const value = useMemo<LoupeRegistryState>(
     () => ({
       scenes,
@@ -311,4 +365,13 @@ export function useSceneRootRef(): React.RefObject<HTMLElement | null> {
   if (!ref)
     throw new Error('useSceneRootRef must be used inside a TimelineProvider');
   return ref;
+}
+
+/**
+ * Like `useSceneRootRef` but returns `null` when no provider is mounted.
+ * Used by `<SceneRoot>` to detect whether Loupe is active without throwing
+ * in production code that ships the component but skips the provider.
+ */
+export function useOptionalSceneRootRef(): React.RefObject<HTMLElement | null> | null {
+  return useContext(SceneRootRefContext);
 }
