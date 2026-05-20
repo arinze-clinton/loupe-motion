@@ -190,7 +190,9 @@ function Pin({
             position: 'fixed',
             left: Math.max(8, Math.min(window.innerWidth - 336, rect.x)),
             top: Math.min(window.innerHeight - 180, rect.y + 36),
-            zIndex: 10060,
+            // Aligned with the new-annotation composer — both must
+            // sit above the sample-stop pill (z 10050).
+            zIndex: 10070,
             width: 320,
             background: PANEL_BG,
             color: PANEL_FG,

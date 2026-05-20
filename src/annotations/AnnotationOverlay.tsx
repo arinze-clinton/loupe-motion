@@ -413,7 +413,9 @@ function DraftEditor() {
           left,
           top,
           width: editorWidth,
-          zIndex: 10001,
+          // Must sit above the sample-stop pill (z 10050) so the
+          // composer is never occluded while typing feedback.
+          zIndex: 10070,
           background: PANEL_BG,
           color: PANEL_FG,
           borderRadius: 12,
