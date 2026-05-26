@@ -772,6 +772,7 @@ function ActiveScenePanel({
   return (
     <>
       <SceneFlashOverlay registry={registry} />
+      <SceneActiveHalo registry={registry} />
 
       <motion.div
         data-loupe-ui
@@ -1440,23 +1441,64 @@ function SceneFlashOverlay({ registry }: { registry: Registry }) {
     // Scroll the scene into view first so the flash and the
     // animation itself are actually visible. `block: 'center'`
     // frames the scene rather than jamming its top against the
-    // viewport. Then wait a beat for the scroll to settle before
-    // measuring its final rect for the flash overlay — otherwise
-    // the flash is drawn at the pre-scroll position.
+    // viewport.
     try {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } catch {
       el.scrollIntoView();
     }
-    // Give the smooth scroll ~400ms to land, then capture the rect.
-    // The flash itself runs ~700ms after that.
-    const measure = window.setTimeout(() => {
-      setRect(el.getBoundingClientRect());
-    }, 400);
-    const clear = window.setTimeout(() => setRect(null), 400 + 750);
+    // Wait for the smooth scroll to ACTUALLY stop, not a fixed
+    // 400ms guess — smooth-scroll duration varies by browser and
+    // distance. Poll every frame and only fire once the rect has
+    // been identical for ~120ms. Otherwise the flash paints
+    // mid-scroll at a stale position and the rest of the fade
+    // plays out there while the page keeps moving.
+    let raf = 0;
+    let clearTimer = 0;
+    let lastMeasured: DOMRect | null = null;
+    let stableSince = 0;
+    let fired = false;
+    const STABLE_MS = 120;
+    const STABLE_TIMEOUT_MS = 1500;
+    const startedAt = performance.now();
+
+    const tick = () => {
+      const now = performance.now();
+      const next = el.getBoundingClientRect();
+      if (
+        lastMeasured &&
+        lastMeasured.left === next.left &&
+        lastMeasured.top === next.top &&
+        lastMeasured.width === next.width &&
+        lastMeasured.height === next.height
+      ) {
+        if (stableSince === 0) stableSince = now;
+        if (now - stableSince >= STABLE_MS) {
+          fired = true;
+          setRect(next);
+          clearTimer = window.setTimeout(() => setRect(null), 750);
+          return;
+        }
+      } else {
+        stableSince = 0;
+        lastMeasured = next;
+      }
+      if (now - startedAt > STABLE_TIMEOUT_MS) {
+        fired = true;
+        setRect(next);
+        clearTimer = window.setTimeout(() => setRect(null), 750);
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
     return () => {
-      window.clearTimeout(measure);
-      window.clearTimeout(clear);
+      cancelAnimationFrame(raf);
+      if (clearTimer) window.clearTimeout(clearTimer);
+      // If we never fired (e.g., user re-selected before settle),
+      // silently drop — no stale flash will paint.
+      void fired;
     };
   }, [registry.flashTick, registry.activeSceneId, registry.scenes]);
 
@@ -1480,6 +1522,137 @@ function SceneFlashOverlay({ registry }: { registry: Registry }) {
         boxShadow: `0 0 0 4px ${ACCENT_RING}, 0 0 32px 8px ${ACCENT_HALO}`,
         boxSizing: 'border-box',
         zIndex: 10049,
+      }}
+    />
+  );
+}
+
+/**
+ * Persistent, subtle halo around the active scene's root. Lives for
+ * as long as a scene is active — answers "what am I scrubbing right
+ * now?" at a glance. The momentary `SceneFlashOverlay` sits on top
+ * during selection; this layer stays after the flash fades.
+ */
+function SceneActiveHalo({ registry }: { registry: Registry }) {
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  const [radius, setRadius] = useState<string>('12px');
+  const [visible, setVisible] = useState(false);
+  const activeId = registry.activeSceneId;
+
+  useLayoutEffect(() => {
+    if (!activeId) {
+      setRect(null);
+      setVisible(false);
+      return;
+    }
+    const scene = registry.scenes.find((s) => s.id === activeId);
+    const el = scene?.rootRef.current;
+    if (!el) {
+      setRect(null);
+      setVisible(false);
+      return;
+    }
+
+    // Don't paint until the scroll-into-view (triggered by the flash
+    // overlay on the same `activeSceneId` change) has settled. Smooth
+    // scroll duration varies wildly by browser and distance, so we
+    // detect stability instead of timing it: poll the rect every
+    // frame, and only reveal once it has been identical for ~120ms.
+    // That's "the scroll has actually stopped" — robust to short
+    // and long scroll distances both.
+    setVisible(false);
+
+    let raf = 0;
+    let lastRect: DOMRect | null = null;
+    let stableSince = 0;
+    let revealed = false;
+    const STABLE_MS = 120;
+    const STABLE_TIMEOUT_MS = 1500;
+    const startedAt = performance.now();
+
+    const rectsEqual = (a: DOMRect, b: DOMRect) =>
+      a.left === b.left &&
+      a.top === b.top &&
+      a.width === b.width &&
+      a.height === b.height;
+
+    const measureNow = () => {
+      const next = el.getBoundingClientRect();
+      setRect((prev) => (prev && rectsEqual(prev, next) ? prev : next));
+      return next;
+    };
+
+    const reveal = () => {
+      revealed = true;
+      try {
+        setRadius(window.getComputedStyle(el).borderRadius || '12px');
+      } catch {
+        setRadius('12px');
+      }
+      measureNow();
+      setVisible(true);
+    };
+
+    const tick = () => {
+      const now = performance.now();
+      const next = el.getBoundingClientRect();
+      if (lastRect && rectsEqual(lastRect, next)) {
+        if (stableSince === 0) stableSince = now;
+        if (!revealed && now - stableSince >= STABLE_MS) {
+          reveal();
+        }
+      } else {
+        stableSince = 0;
+        lastRect = next;
+      }
+      if (revealed) {
+        setRect((prev) => (prev && rectsEqual(prev, next) ? prev : next));
+      }
+      // Hard cap so a constantly-shifting scene still eventually shows
+      // the halo. Better one-frame jitter than no halo at all.
+      if (!revealed && now - startedAt > STABLE_TIMEOUT_MS) {
+        reveal();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    const schedule = () => {
+      // Manual scroll/resize: re-measure on next frame so the halo
+      // tracks user interaction once visible.
+      stableSince = 0;
+    };
+
+    const ro = new ResizeObserver(schedule);
+    ro.observe(el);
+    window.addEventListener('scroll', schedule, { capture: true, passive: true });
+    window.addEventListener('resize', schedule);
+    return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
+      window.removeEventListener('scroll', schedule, { capture: true } as EventListenerOptions);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [activeId, registry.scenes]);
+
+  if (!rect) return null;
+  return (
+    <div
+      data-loupe-ui
+      aria-hidden
+      style={{
+        position: 'fixed',
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+        pointerEvents: 'none',
+        borderRadius: radius,
+        boxShadow: `0 0 0 1px ${ACCENT_RING}, 0 0 24px 2px ${ACCENT_RING}`,
+        boxSizing: 'border-box',
+        zIndex: 10048,
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 220ms ease',
       }}
     />
   );
