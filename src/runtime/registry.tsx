@@ -305,6 +305,13 @@ export function useRegisterSceneWithLoupe(
   const registerScene = registry?.registerScene;
   const unregisterScene = registry?.unregisterScene;
 
+  // Identity-level registration. Mount = register, unmount =
+  // unregister. paused/speed are intentionally NOT in deps —
+  // re-running the cleanup on every pause toggle would call
+  // unregisterScene mid-flip, which reassigns active to whatever
+  // remained in the registry (the first-registered scene), causing
+  // the panel to jump scenes. A second effect below pushes the
+  // live paused/speed values without tearing registration down.
   useEffect(() => {
     if (!registerScene || !unregisterScene) return;
     registerScene({
@@ -334,12 +341,35 @@ export function useRegisterSceneWithLoupe(
     scene.phaseLabels,
     scene.ranges,
     scene.totalDuration,
-    scene.paused,
-    scene.speed,
     rootRef,
     registerScene,
     unregisterScene,
   ]);
+
+  // Live paused/speed updates. registerScene merges by id, so this
+  // just refreshes the values without an unregister cycle.
+  useEffect(() => {
+    if (!registerScene) return;
+    registerScene({
+      id: scene.id,
+      label: scene.label,
+      rootRef,
+      timeline: {
+        time: scene.time,
+        ranges: scene.ranges,
+        totalDuration: scene.totalDuration,
+        phaseOrder: scene.phaseOrder,
+        phaseLabels: scene.phaseLabels,
+        speed: scene.speed,
+        setSpeed: scene.setSpeed,
+        paused: scene.paused,
+        setPaused: scene.setPaused,
+        seek: scene.seek,
+        restart: scene.restart,
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scene.paused, scene.speed]);
 }
 
 const SceneRootRefContext = createContext<React.RefObject<HTMLElement | null> | null>(

@@ -119,6 +119,14 @@ export function TimelineProvider({
   );
 
   const registry = useOptionalLoupeRegistry();
+  // Identity-level registration. Mount = register, unmount =
+  // unregister. We deliberately KEEP paused/speed out of the deps
+  // here: React would otherwise run the cleanup (unregisterScene)
+  // on every pause toggle, and `unregisterScene` reassigns the
+  // active scene to whatever's left in the array — which snaps the
+  // panel to the first-registered scene mid-flip. A separate
+  // effect below pushes paused/speed updates without tearing the
+  // registration down.
   useEffect(() => {
     if (!registry) return;
     registry.registerScene({
@@ -148,9 +156,33 @@ export function TimelineProvider({
     config.phaseLabels,
     ranges,
     totalDuration,
-    paused,
-    speed,
   ]);
+
+  // Live updates for paused/speed. registerScene merges into the
+  // existing entry by id (Object.assign), so this just refreshes
+  // the live values without a register/unregister cycle.
+  useEffect(() => {
+    if (!registry) return;
+    registry.registerScene({
+      id: config.id,
+      label: config.label,
+      rootRef: sceneRootRef,
+      timeline: {
+        time,
+        ranges,
+        totalDuration,
+        phaseOrder: config.phaseOrder,
+        phaseLabels: config.phaseLabels,
+        speed,
+        setSpeed,
+        paused,
+        setPaused,
+        seek,
+        restart,
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused, speed]);
 
   return (
     <TimelineContext.Provider value={value}>
