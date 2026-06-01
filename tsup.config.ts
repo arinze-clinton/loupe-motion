@@ -35,6 +35,26 @@ export default defineConfig([
     ],
     treeshake: true,
   },
+  // GSAP subpath — kept separate so consumers who don't need gsap
+  // integration never pay for it. `gsap` is an optional peer dep;
+  // the hook dynamic-imports it at runtime. `@arinze-clinton/loupe`
+  // is externalized for the same TimelineContext-sharing reason as
+  // the lottie subpath above.
+  {
+    entry: { 'gsap/index': 'src/gsap/index.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    clean: false,
+    external: [
+      'react',
+      'react-dom',
+      'framer-motion',
+      'gsap',
+      '@arinze-clinton/loupe',
+    ],
+    treeshake: true,
+  },
   // CLI bundle — Node-only, no React
   {
     entry: { 'cli/index': 'cli/index.ts' },

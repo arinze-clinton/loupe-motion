@@ -49,7 +49,7 @@ Findings:
 - `timeline-bound` — files importing `@arinze-clinton/loupe` (good)
 - `motion` — `<motion.x animate={...}>` or `useAnimate()` (fire-forget)
 - `waapi` — `element.animate({...})` (cleanest to refactor — already exposes `currentTime`)
-- `gsap` — `gsap.to/from/timeline` (refactorable to GSAP timeline + Loupe registration)
+- `gsap` — `gsap.to/from/timeline` (bridge with the `@arinze-clinton/loupe/gsap` adapter — see recipe below)
 - `css-keyframes` — `@keyframes` blocks (must refactor — browsers own the clock, no scrub)
 - `css-transition` — `transition:` declarations (fire-forget)
 
@@ -75,6 +75,22 @@ For each fire-and-forget animation, the rough recipe is:
 const opacity = useTimelineValue(0, 1, { phase: 'enter', offset: 200, duration: 500 });
 <motion.div style={{ opacity }} />
 ```
+
+**GSAP `gsap.to/from/timeline`:**
+Don't rewrite — bridge. Use the `@arinze-clinton/loupe/gsap` adapter. It builds your timeline paused and drives its playhead from Loupe's `time`, so the existing GSAP authoring stays intact and becomes scrubbable.
+```tsx
+import { useLoupeGsap } from '@arinze-clinton/loupe/gsap';
+
+const scopeRef = useRef<HTMLDivElement | null>(null);
+useLoupeGsap({
+  scope: scopeRef.current,
+  deps: [scopeRef.current],
+  // Was: gsap.timeline().from('.title', { y: 40, opacity: 0, duration: 0.5 })
+  build: (gsap) =>
+    gsap.timeline().from('.title', { y: 40, opacity: 0, duration: 0.5 }),
+});
+```
+Drop any `repeat`/`yoyo`/`delay` that exists only to loop — Loupe loops the phase. The scene still needs a `<TimelineProvider>` above it whose `totalDuration` covers the timeline's length. `gsap` is an optional peer dep (`npm i gsap`).
 
 **WAAPI `element.animate()`:**
 WAAPI exposes `currentTime` natively. Either keep it and drive `currentTime` from a `useTimelineValue` mapped to a real ms range, or rewrite as a Framer transform.

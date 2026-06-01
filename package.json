@@ -20,6 +20,11 @@
       "import": "./dist/lottie/index.js",
       "require": "./dist/lottie/index.cjs"
     },
+    "./gsap": {
+      "types": "./dist/gsap/index.d.ts",
+      "import": "./dist/gsap/index.js",
+      "require": "./dist/gsap/index.cjs"
+    },
     "./styles.css": "./dist/styles.css"
   },
   "bin": {
@@ -49,11 +54,15 @@
   },
   "peerDependencies": {
     "framer-motion": ">=11",
+    "gsap": ">=3",
     "lottie-web": ">=5",
     "react": ">=18",
     "react-dom": ">=18"
   },
   "peerDependenciesMeta": {
+    "gsap": {
+      "optional": true
+    },
     "lottie-web": {
       "optional": true
     }
@@ -74,6 +83,7 @@
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
     "framer-motion": "^11.0.0",
+    "gsap": "^3.15.0",
     "happy-dom": "^20.9.0",
     "lottie-web": "^5.12.0",
     "react": "^18.2.0",
