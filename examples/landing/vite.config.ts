@@ -5,8 +5,6 @@ import path from 'node:path';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Resolve `@arinze-clinton/loupe` to the local source so every edit
-// in `src/` shows up in the playground immediately — no rebuild needed.
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -34,7 +32,7 @@ export default defineConfig({
     ],
   },
   server: {
-    port: 5174,
+    port: 5175,
     open: true,
   },
 });

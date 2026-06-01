@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Harbor — Launch days that don't feel like fires</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --canvas: #f4efe9;
+        --panel-light: #ffffff;
+        --panel-dark: #14110f;
+        --ink: #14110f;
+        --ink-muted: #5b554f;
+        --ink-subtle: #8a857e;
+        --ink-on-dark: #f4efe9;
+        --ink-on-dark-muted: #a8a39d;
+        --hairline: #e6dfd5;
+        --hairline-dark: #2a2622;
+        --accent: #ff6b4a;
+        --accent-soft: #ffd4c7;
+        --success: #4caf50;
+        --blue: #4a8fff;
+        --purple: #9b6bff;
+      }
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+      html,
+      body,
+      #root {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family:
+          'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+        font-feature-settings: 'cv11', 'ss01';
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      ::selection {
+        background: var(--accent);
+        color: var(--ink-on-dark);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

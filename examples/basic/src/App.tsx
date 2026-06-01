@@ -6,6 +6,15 @@ import {
   LoupeRegistryProvider,
   useLoupeRegistry,
 } from '@arinze-clinton/loupe';
+import { GsapDemo } from './GsapDemo';
+
+// Opt-in demo scenes for exercising the adapters. The default
+// playground stays empty (first-install onboarding state); add
+// `?demo=gsap` to the URL to mount the GSAP adapter smoke test.
+const demo =
+  typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('demo')
+    : null;
 
 /**
  * Playground entry point.
@@ -20,7 +29,7 @@ export function App() {
   return (
     <LoupeRegistryProvider>
       <AnnotationsProvider>
-        <Placeholder />
+        {demo === 'gsap' ? <GsapDemo /> : <Placeholder />}
         <LoupePanel />
         <AnnotationOverlay />
         <AnnotationPins />
