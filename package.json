@@ -25,6 +25,11 @@
       "import": "./dist/gsap/index.js",
       "require": "./dist/gsap/index.cjs"
     },
+    "./waapi": {
+      "types": "./dist/waapi/index.d.ts",
+      "import": "./dist/waapi/index.js",
+      "require": "./dist/waapi/index.cjs"
+    },
     "./styles.css": "./dist/styles.css"
   },
   "bin": {

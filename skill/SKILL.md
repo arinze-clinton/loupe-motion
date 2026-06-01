@@ -48,7 +48,7 @@ Walks the project's `.ts/.tsx/.js/.jsx/.css/.scss` files and reports animations.
 Findings:
 - `timeline-bound` — files importing `@arinze-clinton/loupe` (good)
 - `motion` — `<motion.x animate={...}>` or `useAnimate()` (fire-forget)
-- `waapi` — `element.animate({...})` (cleanest to refactor — already exposes `currentTime`)
+- `waapi` — `element.animate({...})` (bridge with the `@arinze-clinton/loupe/waapi` adapter — already exposes `currentTime`, see recipe below)
 - `gsap` — `gsap.to/from/timeline` (bridge with the `@arinze-clinton/loupe/gsap` adapter — see recipe below)
 - `css-keyframes` — `@keyframes` blocks (must refactor — browsers own the clock, no scrub)
 - `css-transition` — `transition:` declarations (fire-forget)
@@ -93,7 +93,24 @@ useLoupeGsap({
 Drop any `repeat`/`yoyo`/`delay` that exists only to loop — Loupe loops the phase. The scene still needs a `<TimelineProvider>` above it whose `totalDuration` covers the timeline's length. `gsap` is an optional peer dep (`npm i gsap`).
 
 **WAAPI `element.animate()`:**
-WAAPI exposes `currentTime` natively. Either keep it and drive `currentTime` from a `useTimelineValue` mapped to a real ms range, or rewrite as a Framer transform.
+Don't rewrite — bridge. Use the `@arinze-clinton/loupe/waapi` adapter. WAAPI's `currentTime` is in ms, same as Loupe's clock, so it pauses the animation and writes `currentTime` each tick. Keep your existing `element.animate()` call; just add `fill: 'both'` so the element holds its values when scrubbed to either edge.
+```tsx
+import { useLoupeWaapi } from '@arinze-clinton/loupe/waapi';
+
+const boxRef = useRef<HTMLDivElement | null>(null);
+useLoupeWaapi({
+  deps: [boxRef.current],
+  build: () =>
+    boxRef.current?.animate(
+      [
+        { transform: 'translateY(40px)', opacity: 0 },
+        { transform: 'translateY(0)', opacity: 1 },
+      ],
+      { duration: 500, easing: 'ease-out', fill: 'both' },
+    ) ?? null,
+});
+```
+No extra dependency — WAAPI is built into the browser. The scene still needs a `<TimelineProvider>` above it.
 
 **CSS `@keyframes`:**
 The hardest case. Either:

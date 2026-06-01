@@ -55,6 +55,24 @@ export default defineConfig([
     ],
     treeshake: true,
   },
+  // WAAPI subpath — Web Animations API has no dependency to isolate
+  // (it's a browser native), but it lives at its own subpath to
+  // parallel /lottie and /gsap. `@arinze-clinton/loupe` is
+  // externalized for the same TimelineContext-sharing reason.
+  {
+    entry: { 'waapi/index': 'src/waapi/index.ts' },
+    format: ['esm', 'cjs'],
+    dts: true,
+    sourcemap: true,
+    clean: false,
+    external: [
+      'react',
+      'react-dom',
+      'framer-motion',
+      '@arinze-clinton/loupe',
+    ],
+    treeshake: true,
+  },
   // CLI bundle — Node-only, no React
   {
     entry: { 'cli/index': 'cli/index.ts' },
