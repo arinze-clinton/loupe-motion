@@ -1562,65 +1562,94 @@ function SceneActiveHalo({ registry }: { registry: Registry }) {
     // and long scroll distances both.
     setVisible(false);
 
-    let raf = 0;
-    let lastRect: DOMRect | null = null;
-    let stableSince = 0;
-    let revealed = false;
-    const STABLE_MS = 120;
-    const STABLE_TIMEOUT_MS = 1500;
-    const startedAt = performance.now();
-
     const rectsEqual = (a: DOMRect, b: DOMRect) =>
       a.left === b.left &&
       a.top === b.top &&
       a.width === b.width &&
       a.height === b.height;
 
-    const measureNow = () => {
-      const next = el.getBoundingClientRect();
-      setRect((prev) => (prev && rectsEqual(prev, next) ? prev : next));
-      return next;
-    };
-
     const reveal = () => {
-      revealed = true;
       try {
         setRadius(window.getComputedStyle(el).borderRadius || '12px');
       } catch {
         setRadius('12px');
       }
-      measureNow();
+      const next = el.getBoundingClientRect();
+      setRect((prev) => (prev && rectsEqual(prev, next) ? prev : next));
       setVisible(true);
     };
 
-    const tick = () => {
+    // Phase 1 — wait for the scroll-into-view (triggered on the same
+    // activeSceneId change) to ACTUALLY settle, then reveal and STOP
+    // the rAF. Critically, this loop terminates: it does NOT keep
+    // measuring forever. A permanently-running rAF that calls
+    // getBoundingClientRect every frame forces a synchronous reflow
+    // each frame and keeps the page from ever going idle, which
+    // starves the main thread and makes the panel feel unresponsive.
+    let settleRaf = 0;
+    let lastRect: DOMRect | null = null;
+    let stableSince = 0;
+    const STABLE_MS = 120;
+    const STABLE_TIMEOUT_MS = 1500;
+    const startedAt = performance.now();
+
+    const settle = () => {
       const now = performance.now();
       const next = el.getBoundingClientRect();
       if (lastRect && rectsEqual(lastRect, next)) {
         if (stableSince === 0) stableSince = now;
-        if (!revealed && now - stableSince >= STABLE_MS) {
+        if (now - stableSince >= STABLE_MS) {
           reveal();
+          settleRaf = 0;
+          return;
         }
       } else {
         stableSince = 0;
         lastRect = next;
       }
-      if (revealed) {
-        setRect((prev) => (prev && rectsEqual(prev, next) ? prev : next));
-      }
       // Hard cap so a constantly-shifting scene still eventually shows
       // the halo. Better one-frame jitter than no halo at all.
-      if (!revealed && now - startedAt > STABLE_TIMEOUT_MS) {
+      if (now - startedAt > STABLE_TIMEOUT_MS) {
         reveal();
+        settleRaf = 0;
+        return;
       }
-      raf = requestAnimationFrame(tick);
+      settleRaf = requestAnimationFrame(settle);
     };
-    raf = requestAnimationFrame(tick);
+    settleRaf = requestAnimationFrame(settle);
+
+    // Phase 2 — once revealed, only track the target while it's
+    // actually moving (page scroll, resize). Coalesce to a single
+    // rAF and STOP a few stable frames after motion ceases, so an
+    // idle page runs no rAF and does no per-frame layout work.
+    let trackRaf = 0;
+    let trackLast: DOMRect | null = null;
+    let trackStableFrames = 0;
+    const track = () => {
+      const next = el.getBoundingClientRect();
+      setRect((prev) => (prev && rectsEqual(prev, next) ? prev : next));
+      if (trackLast && rectsEqual(trackLast, next)) {
+        trackStableFrames += 1;
+      } else {
+        trackStableFrames = 0;
+      }
+      trackLast = next;
+      if (trackStableFrames >= 3) {
+        trackRaf = 0;
+        return;
+      }
+      trackRaf = requestAnimationFrame(track);
+    };
 
     const schedule = () => {
-      // Manual scroll/resize: re-measure on next frame so the halo
-      // tracks user interaction once visible.
-      stableSince = 0;
+      // Before reveal, just keep Phase 1 waiting for stability.
+      if (settleRaf) {
+        stableSince = 0;
+        return;
+      }
+      // After reveal, (re)start the short tracking burst.
+      trackStableFrames = 0;
+      if (!trackRaf) trackRaf = requestAnimationFrame(track);
     };
 
     const ro = new ResizeObserver(schedule);
@@ -1628,7 +1657,8 @@ function SceneActiveHalo({ registry }: { registry: Registry }) {
     window.addEventListener('scroll', schedule, { capture: true, passive: true });
     window.addEventListener('resize', schedule);
     return () => {
-      cancelAnimationFrame(raf);
+      if (settleRaf) cancelAnimationFrame(settleRaf);
+      if (trackRaf) cancelAnimationFrame(trackRaf);
       ro.disconnect();
       window.removeEventListener('scroll', schedule, { capture: true } as EventListenerOptions);
       window.removeEventListener('resize', schedule);
