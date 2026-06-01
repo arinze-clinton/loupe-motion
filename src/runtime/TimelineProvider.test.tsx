@@ -5,6 +5,7 @@ import { TimelineProvider } from './TimelineProvider';
 import {
   LoupeRegistryProvider,
   useLoupeRegistry,
+  useSceneRootRef,
   type RegisteredScene,
 } from './registry';
 
@@ -27,8 +28,21 @@ const CONFIG = {
   phaseDurations: { idle: 100, enter: 200 },
 };
 
+// Consumer that attaches the scene-root ref to its own element via
+// `useSceneRootRef()` — the supported way to give the registry a
+// real DOM node to flash / scroll to (the provider no longer wraps
+// children itself).
+function SceneConsumer() {
+  const ref = useSceneRootRef();
+  return (
+    <div ref={ref as React.Ref<HTMLDivElement>} data-testid="scene-child">
+      hello
+    </div>
+  );
+}
+
 describe('TimelineProvider', () => {
-  it('registers a scene whose rootRef points at a real DOM element', async () => {
+  it('registers a scene whose rootRef resolves once a consumer attaches it', async () => {
     let captured: RegisteredScene[] = [];
 
     await act(async () => {
@@ -36,7 +50,7 @@ describe('TimelineProvider', () => {
         <LoupeRegistryProvider>
           <CaptureScenes onScenes={(s) => (captured = s)} />
           <TimelineProvider config={CONFIG}>
-            <div data-testid="scene-child">hello</div>
+            <SceneConsumer />
           </TimelineProvider>
         </LoupeRegistryProvider>,
       );
@@ -46,14 +60,17 @@ describe('TimelineProvider', () => {
     const scene = captured[0]!;
     expect(scene.id).toBe('test-scene');
 
-    // Regression: previously `sceneRootRef` was never attached to a
-    // DOM node, so `scene.rootRef.current` stayed null forever and
-    // SceneFlashOverlay's scrollIntoView/measure was a silent no-op.
+    // The provider hands consumers a ref via `useSceneRootRef()`.
+    // Once attached, `scene.rootRef.current` is the consumer's real
+    // element — that's what SceneFlashOverlay measures / scrolls to.
     expect(scene.rootRef.current).not.toBeNull();
     expect(scene.rootRef.current).toBeInstanceOf(Element);
+    expect((scene.rootRef.current as HTMLElement).dataset.testid).toBe(
+      'scene-child',
+    );
   });
 
-  it('keeps scene children rendered as a layout-invisible wrapper', async () => {
+  it('renders scene children directly, without an extra wrapper element', async () => {
     let dom: HTMLElement;
     await act(async () => {
       const { container } = render(
@@ -66,12 +83,12 @@ describe('TimelineProvider', () => {
       dom = container;
     });
 
-    // The wrapper div uses `display: contents` so any flex/grid layout
-    // a host applies still sees the scene's content as a direct child
-    // rather than getting pushed inside an extra block-level box.
+    // The provider deliberately does NOT insert a `display: contents`
+    // wrapper (it broke `useInView` / IntersectionObserver, which
+    // treats contents elements as having no layout box). Children
+    // mount straight under the render container.
     const child = dom!.querySelector('[data-testid="child"]') as HTMLElement;
     expect(child).not.toBeNull();
-    const wrapper = child.parentElement!;
-    expect(wrapper.style.display).toBe('contents');
+    expect(child.parentElement).toBe(dom!);
   });
 });
