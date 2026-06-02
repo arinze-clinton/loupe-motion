@@ -607,8 +607,14 @@ function CollapsedPanel({
   return (
     <motion.div
       data-loupe-ui
-      className="pointer-events-none fixed"
       style={{
+        // Inline styles only — Loupe ships no CSS, so we must not
+        // rely on host utility classes (Tailwind `fixed` /
+        // `pointer-events-none`). Without `position: fixed` here the
+        // pill drops into normal document flow and renders below the
+        // page content instead of floating at the bottom-center.
+        position: 'fixed',
+        pointerEvents: 'none',
         bottom: 16,
         left: '50%',
         zIndex: 10050,
