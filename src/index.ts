@@ -39,7 +39,9 @@ export { LoupePanel } from './panel/LoupePanel';
 export {
   AnnotationsProvider,
   useAnnotations,
+  UNDO_WINDOW_MS,
   type PickerMode,
+  type UndoEntry,
 } from './annotations/AnnotationsProvider';
 export { AnnotationOverlay } from './annotations/AnnotationOverlay';
 export { AnnotationPins } from './annotations/AnnotationPins';

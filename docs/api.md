@@ -141,6 +141,19 @@ function HeroScene() {
 
 Access the annotation system's state and actions. Used by `<LoupePanel>` and the overlay/pins, but exposed for custom integrations.
 
+Destructive actions — `clearAll()` and `deleteAnnotation(id)` — apply immediately and are **not** gated behind a confirmation dialog. A browser can suppress `window.confirm()` (Chrome's "prevent this page from creating additional dialogs" checkbox, or a sandboxed iframe without `allow-modals`), in which case it returns `false` with no UI at all and the action silently does nothing. Instead, each one records a restorable snapshot:
+
+```tsx
+const { clearAll, undo, undoLastAction, dismissUndo } = useAnnotations();
+
+clearAll();            // clears the ACTIVE scene only, immediately
+undo;                  // { sceneId, label, annotations } | null
+undoLastAction();      // restores the snapshot into its own sceneId
+dismissUndo();         // drops the snapshot early
+```
+
+`undo` expires after `UNDO_WINDOW_MS` (6s). `undoLastAction()` restores into the scene the snapshot came from, so switching scenes inside the window is safe. `<LoupePanel>` renders this as an in-panel "undo" bar.
+
 ## Curves
 
 ### `HOUSE_CURVE_FN: EasingFunction`

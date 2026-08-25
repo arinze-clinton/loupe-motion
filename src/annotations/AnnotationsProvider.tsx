@@ -47,6 +47,29 @@ type AnnotationsState = {
   deleteAnnotation: (id: string) => void;
   clearAll: () => void;
   focusAnnotation: (id: string) => Annotation | undefined;
+
+  /**
+   * Snapshot of the last destructive action, restorable for UNDO_WINDOW_MS.
+   *
+   * Destructive annotation actions are NOT gated behind `window.confirm()`.
+   * A suppressed confirm (Chrome's "prevent additional dialogs" checkbox, or
+   * a sandboxed iframe without `allow-modals`) returns `false` instantly and
+   * without UI, which made the control silently do nothing. Delete now
+   * happens immediately and is undoable instead.
+   */
+  undo: UndoEntry | null;
+  undoLastAction: () => void;
+  dismissUndo: () => void;
+};
+
+/** How long an undone-able action stays restorable. */
+export const UNDO_WINDOW_MS = 6000;
+
+export type UndoEntry = {
+  /** Scene this snapshot belongs to. Restore targets THIS, not the active scene. */
+  sceneId: string;
+  label: string;
+  annotations: Annotation[];
 };
 
 const AnnotationsContext = createContext<AnnotationsState | null>(null);
@@ -95,6 +118,30 @@ export function AnnotationsProvider({ children }: { children: React.ReactNode })
       }));
     },
     [],
+  );
+
+  const [undo, setUndo] = useState<UndoEntry | null>(null);
+  const undoTimerRef = useRef<number | null>(null);
+
+  const clearUndoTimer = useCallback(() => {
+    if (undoTimerRef.current !== null) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => clearUndoTimer, [clearUndoTimer]);
+
+  const pushUndo = useCallback(
+    (entry: UndoEntry) => {
+      clearUndoTimer();
+      setUndo(entry);
+      undoTimerRef.current = window.setTimeout(() => {
+        undoTimerRef.current = null;
+        setUndo(null);
+      }, UNDO_WINDOW_MS);
+    },
+    [clearUndoTimer],
   );
 
   const setPickerMode = useCallback(
@@ -210,15 +257,44 @@ export function AnnotationsProvider({ children }: { children: React.ReactNode })
   const deleteAnnotation = useCallback(
     (id: string) => {
       if (!activeSceneId) return;
-      setSceneAnnotations(activeSceneId, (prev) => prev.filter((a) => a.id !== id));
+      const sceneId = activeSceneId;
+      const before = annotationsBySceneId[sceneId] ?? [];
+      if (!before.some((a) => a.id === id)) return;
+      setSceneAnnotations(sceneId, (prev) => prev.filter((a) => a.id !== id));
+      pushUndo({ sceneId, label: 'Annotation deleted', annotations: before });
     },
-    [activeSceneId, setSceneAnnotations],
+    [activeSceneId, annotationsBySceneId, setSceneAnnotations, pushUndo],
   );
 
   const clearAll = useCallback(() => {
     if (!activeSceneId) return;
-    setSceneAnnotations(activeSceneId, () => []);
-  }, [activeSceneId, setSceneAnnotations]);
+    const sceneId = activeSceneId;
+    const before = annotationsBySceneId[sceneId] ?? [];
+    if (before.length === 0) return;
+    setSceneAnnotations(sceneId, () => []);
+    pushUndo({
+      sceneId,
+      label: `Cleared ${before.length} annotation${before.length === 1 ? '' : 's'}`,
+      annotations: before,
+    });
+  }, [activeSceneId, annotationsBySceneId, setSceneAnnotations, pushUndo]);
+
+  const undoLastAction = useCallback(() => {
+    if (!undo) return;
+    const { sceneId, annotations: snapshot } = undo;
+    setSceneAnnotations(sceneId, () => snapshot);
+    // The persistence effect only writes the *active* scene. Write the
+    // restored scene straight through, in case the user switched scenes
+    // during the undo window.
+    saveAnnotations(sceneId, snapshot);
+    clearUndoTimer();
+    setUndo(null);
+  }, [undo, setSceneAnnotations, clearUndoTimer]);
+
+  const dismissUndo = useCallback(() => {
+    clearUndoTimer();
+    setUndo(null);
+  }, [clearUndoTimer]);
 
   const focusAnnotation = useCallback(
     (id: string) => {
@@ -251,6 +327,9 @@ export function AnnotationsProvider({ children }: { children: React.ReactNode })
       deleteAnnotation,
       clearAll,
       focusAnnotation,
+      undo,
+      undoLastAction,
+      dismissUndo,
     }),
     [
       annotations,
@@ -266,6 +345,9 @@ export function AnnotationsProvider({ children }: { children: React.ReactNode })
       deleteAnnotation,
       clearAll,
       focusAnnotation,
+      undo,
+      undoLastAction,
+      dismissUndo,
     ],
   );
 

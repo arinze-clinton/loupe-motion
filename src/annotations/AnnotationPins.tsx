@@ -123,7 +123,9 @@ function Pin({
         }}
         onContextMenu={(e) => {
           e.preventDefault();
-          if (confirm(`Delete annotation #${index}?`)) onDelete();
+          // No confirm() gate: a suppressed dialog returns false silently and
+          // the delete never happens. Deleting is undoable from the panel.
+          onDelete();
         }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
@@ -264,10 +266,8 @@ function Pin({
             <button
               type="button"
               onClick={() => {
-                if (confirm(`Delete annotation #${index}?`)) {
-                  onDelete();
-                  setEditing(false);
-                }
+                onDelete();
+                setEditing(false);
               }}
               style={{
                 padding: '5px 10px',

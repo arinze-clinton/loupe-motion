@@ -8,6 +8,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -131,6 +132,7 @@ export function LoupePanel() {
     visible: annotationsVisible,
     setVisible: setAnnotationsVisible,
     annotations,
+    undo,
   } = useAnnotations();
 
   const [expanded, setExpanded] = useState(true);
@@ -324,6 +326,7 @@ export function LoupePanel() {
       annotationsVisible={annotationsVisible}
       setAnnotationsVisible={setAnnotationsVisible}
       annotations={annotations}
+      undo={undo}
       expanded={expanded}
       setExpanded={setExpanded}
       dragControls={dragControls}
@@ -606,80 +609,80 @@ function CollapsedPanel({
 
   return (
     <motion.div
-      data-loupe-ui
+  data-loupe-ui
+  style={{
+    // Inline styles only — Loupe ships no CSS, so we must not
+    // rely on host utility classes (Tailwind `fixed` /
+    // `pointer-events-none`). Without `position: fixed` here the
+    // pill drops into normal document flow and renders below the
+    // page content instead of floating at the bottom-center.
+    position: 'fixed',
+    pointerEvents: 'none',
+    bottom: 16,
+    left: '50%',
+    zIndex: 10050,
+    translateX: '-50%',
+  }}
+>
+  <motion.div
+    ref={panelRef}
+    drag
+    dragListener={false}
+    dragControls={dragControls}
+    dragMomentum={false}
+    dragElastic={0}
+    dragConstraints={dragConstraints}
+    onDragEnd={persistPosition}
+    transition={{ duration: 0.35, ease: [0.59, 0.01, 0.4, 0.98] }}
+    style={{
+      pointerEvents: 'auto',
+      x,
+      y,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 8,
+      padding: '6px 8px 6px 10px',
+      background: PANEL_BG,
+      border: `1px solid ${PANEL_BORDER}`,
+      borderRadius: 999,
+      color: PANEL_FG,
+      fontFamily: FONT,
+      boxShadow:
+        '0 12px 28px rgba(0, 0, 0, 0.30), 0 3px 10px rgba(0, 0, 0, 0.20)',
+      backdropFilter: 'blur(14px)',
+      WebkitBackdropFilter: 'blur(14px)',
+    }}
+  >
+    {/* Drag handle — grabs the whole pill */}
+    <button
+      type="button"
+      aria-label="Drag Loupe"
+      onPointerDown={(e) => dragControls.start(e)}
       style={{
-        // Inline styles only — Loupe ships no CSS, so we must not
-        // rely on host utility classes (Tailwind `fixed` /
-        // `pointer-events-none`). Without `position: fixed` here the
-        // pill drops into normal document flow and renders below the
-        // page content instead of floating at the bottom-center.
-        position: 'fixed',
-        pointerEvents: 'none',
-        bottom: 16,
-        left: '50%',
-        zIndex: 10050,
-        translateX: '-50%',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 22,
+        height: 22,
+        border: 'none',
+        borderRadius: 999,
+        background: 'transparent',
+        color: PANEL_MUTED,
+        cursor: 'grab',
+        padding: 0,
       }}
     >
-      <motion.div
-        ref={panelRef}
-        drag
-        dragListener={false}
-        dragControls={dragControls}
-        dragMomentum={false}
-        dragElastic={0}
-        dragConstraints={dragConstraints}
-        onDragEnd={persistPosition}
-        transition={{ duration: 0.35, ease: [0.59, 0.01, 0.4, 0.98] }}
-        style={{
-          pointerEvents: 'auto',
-          x,
-          y,
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '6px 8px 6px 10px',
-          background: PANEL_BG,
-          border: `1px solid ${PANEL_BORDER}`,
-          borderRadius: 999,
-          color: PANEL_FG,
-          fontFamily: FONT,
-          boxShadow:
-            '0 12px 28px rgba(0, 0, 0, 0.30), 0 3px 10px rgba(0, 0, 0, 0.20)',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
-        }}
-      >
-        {/* Drag handle — grabs the whole pill */}
-        <button
-          type="button"
-          aria-label="Drag Loupe"
-          onPointerDown={(e) => dragControls.start(e)}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 22,
-            height: 22,
-            border: 'none',
-            borderRadius: 999,
-            background: 'transparent',
-            color: PANEL_MUTED,
-            cursor: 'grab',
-            padding: 0,
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-            <circle cx="3" cy="3" r="1.1" />
-            <circle cx="3" cy="6" r="1.1" />
-            <circle cx="3" cy="9" r="1.1" />
-            <circle cx="9" cy="3" r="1.1" />
-            <circle cx="9" cy="6" r="1.1" />
-            <circle cx="9" cy="9" r="1.1" />
-          </svg>
-        </button>
-        <ScenePicker registry={registry} />
-      </motion.div>
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+        <circle cx="3" cy="3" r="1.1" />
+        <circle cx="3" cy="6" r="1.1" />
+        <circle cx="3" cy="9" r="1.1" />
+        <circle cx="9" cy="3" r="1.1" />
+        <circle cx="9" cy="6" r="1.1" />
+        <circle cx="9" cy="9" r="1.1" />
+      </svg>
+    </button>
+    <ScenePicker registry={registry} />
+    </motion.div>
     </motion.div>
   );
 }
@@ -692,6 +695,7 @@ function ActiveScenePanel({
   annotationsVisible,
   setAnnotationsVisible,
   annotations,
+  undo,
   expanded,
   setExpanded,
   dragControls,
@@ -709,6 +713,7 @@ function ActiveScenePanel({
   annotationsVisible: boolean;
   setAnnotationsVisible: (v: boolean) => void;
   annotations: ReturnType<typeof useAnnotations>['annotations'];
+  undo: ReturnType<typeof useAnnotations>['undo'];
   expanded: boolean;
   setExpanded: (v: boolean) => void;
   dragControls: ReturnType<typeof useDragControls>;
@@ -1080,7 +1085,14 @@ function ActiveScenePanel({
                   />
                 </div>
 
-                {annotations.length > 0 && <AnnotationList />}
+                {/*
+                  Keep the section mounted while an undo is pending. Gating
+                  purely on `annotations.length` unmounted the whole list the
+                  instant "clear all" emptied it, taking the undo affordance
+                  with it — the clear would work but say nothing, which is the
+                  bug this control was fixed for in the first place.
+                */}
+                {(annotations.length > 0 || undo) && <AnnotationList />}
               </motion.div>
             ) : (
               <motion.div
@@ -1926,10 +1938,102 @@ function formatMs(ms: number) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/**
+ * UndoBar — in-panel feedback + restore for destructive annotation actions.
+ *
+ * Replaces the old `confirm()` gate. A browser can suppress a native dialog
+ * (Chrome's "prevent additional dialogs" checkbox, sandboxed iframes without
+ * `allow-modals`) in which case confirm() returns false with no UI at all and
+ * the action silently did nothing. Here the action always happens and always
+ * says so; `role="status"` announces it to assistive tech.
+ */
+function UndoBar({
+  undo,
+  onUndo,
+  onDismiss,
+}: {
+  undo: { sceneId: string; label: string } | null;
+  onUndo: () => void;
+  onDismiss: () => void;
+}) {
+  // A plain <div>, deliberately un-animated. Earlier revisions animated this
+  // in with framer-motion (and out via <AnimatePresence>); both left the bar
+  // mounted at `height: 0; opacity: 0` — present in the DOM, invisible on
+  // screen. That is precisely the silent-failure this control was fixed for,
+  // so the feedback path now has no animation that can fail to settle.
+  if (!undo) return null;
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+        marginTop: 8,
+        minHeight: 28,
+        padding: '0 8px',
+        borderRadius: 8,
+        background: 'rgba(255,255,255,0.05)',
+        border: '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
+      <span style={{ fontSize: 10, fontWeight: 600, color: PANEL_MUTED }}>{undo.label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <button
+          type="button"
+          onClick={onUndo}
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: PANEL_HIGHLIGHT,
+            background: 'transparent',
+            border: 'none',
+            padding: '2px 6px',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          undo
+        </button>
+        <button
+          type="button"
+          onClick={onDismiss}
+          aria-label="Dismiss"
+          style={{
+            fontSize: 12,
+            lineHeight: 1,
+            color: PANEL_MUTED,
+            background: 'transparent',
+            border: 'none',
+            padding: '2px 4px',
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+          }}
+        >
+          ×
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function AnnotationList() {
-  const { annotations, focusAnnotation, deleteAnnotation, clearAll } = useAnnotations();
+  const {
+    annotations,
+    focusAnnotation,
+    deleteAnnotation,
+    clearAll,
+    undo,
+    undoLastAction,
+    dismissUndo,
+  } = useAnnotations();
   const [open, setOpen] = useState(true);
   const [copied, setCopied] = useState(false);
+  const listId = useId();
 
   const onCopy = async () => {
     const md = annotationsToMarkdown(annotations);
@@ -1955,76 +2059,116 @@ function AnnotationList() {
   };
   return (
     <div style={{ marginTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          width: '100%',
-          padding: 0,
-          background: 'transparent',
-          border: 'none',
-          color: PANEL_FG,
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-        }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.2 }}>
+      {/*
+        Header row is a plain <div>, NOT a <button>. The disclosure control and
+        the action controls are siblings: nesting a <button> inside a <button>
+        is invalid HTML and the browser drops the inner one.
+      */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+          aria-controls={listId}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: 0,
+            background: 'transparent',
+            border: 'none',
+            color: PANEL_FG,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            textAlign: 'left',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: 0.2,
+          }}
+        >
           Annotations
-          <span style={{ fontWeight: 500, color: PANEL_MUTED, marginLeft: 6 }}>
-            {annotations.length}
-          </span>
-        </span>
+          <span style={{ fontWeight: 500, color: PANEL_MUTED }}>{annotations.length}</span>
+        </button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {annotations.length > 0 && (
             <Tooltip label="Copy every annotation as a Markdown bullet list">
-              <span
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCopy();
-                }}
+              <button
+                type="button"
+                onClick={onCopy}
                 style={{
                   fontSize: 10,
                   fontWeight: 700,
                   color: copied ? '#86EFAC' : PANEL_HIGHLIGHT,
                   cursor: 'pointer',
                   background: copied ? 'rgba(34, 197, 94, 0.15)' : ACCENT,
+                  border: 'none',
                   padding: '2px 8px',
                   borderRadius: 999,
+                  fontFamily: 'inherit',
                 }}
               >
                 {copied ? 'copied ✓' : 'copy feedback'}
-              </span>
+              </button>
             </Tooltip>
           )}
           {annotations.length > 0 && (
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm('Clear all annotations for this scene?')) clearAll();
-              }}
-              style={{ fontSize: 10, fontWeight: 600, color: PANEL_MUTED, cursor: 'pointer' }}
-            >
-              clear all
-            </span>
+            <Tooltip label="Clear this scene's annotations (undoable)">
+              <button
+                type="button"
+                onClick={clearAll}
+                style={{
+                  fontSize: 10,
+                  fontWeight: 600,
+                  color: PANEL_MUTED,
+                  cursor: 'pointer',
+                  background: 'transparent',
+                  border: 'none',
+                  padding: '2px 4px',
+                  borderRadius: 6,
+                  fontFamily: 'inherit',
+                }}
+              >
+                clear all
+              </button>
+            </Tooltip>
           )}
-          <span
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-controls={listId}
+            aria-label={open ? 'Collapse annotation list' : 'Expand annotation list'}
             style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 0,
+              background: 'transparent',
+              border: 'none',
               color: PANEL_MUTED,
-              transform: open ? 'rotate(180deg)' : 'none',
-              transition: 'transform 150ms',
+              cursor: 'pointer',
             }}
           >
-            <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 5l4 4 4-4" />
-            </svg>
-          </span>
+            <span
+              style={{
+                display: 'inline-flex',
+                transform: open ? 'rotate(180deg)' : 'none',
+                transition: 'transform 150ms',
+              }}
+            >
+              <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 5l4 4 4-4" />
+              </svg>
+            </span>
+          </button>
         </div>
-      </button>
+      </div>
+      <UndoBar undo={undo} onUndo={undoLastAction} onDismiss={dismissUndo} />
       {open && (
         <div
+          id={listId}
           style={{
             marginTop: 8,
             maxHeight: 180,
@@ -2098,12 +2242,11 @@ function AnnotationList() {
                   {a.note}
                 </div>
               </button>
-              <Tooltip label="Delete this annotation">
+              <Tooltip label="Delete this annotation (undoable)">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm(`Delete annotation #${i + 1}?`)) deleteAnnotation(a.id);
-                  }}
+                  aria-label={`Delete annotation ${i + 1}`}
+                  onClick={() => deleteAnnotation(a.id)}
                   style={{
                     flexShrink: 0,
                     width: 18,
