@@ -1,5 +1,10 @@
-import { SceneRoot, TimelineProvider, useTimelineValue } from '@arinze-clinton/loupe';
-import { motion } from 'framer-motion';
+import {
+  SceneRoot,
+  TimelineProvider,
+  useTimelineValue,
+  SETTLE_CURVE_FN,
+} from '@arinze-clinton/loupe';
+import { motion, useReducedMotion } from 'framer-motion';
 import { tokens } from '../tokens';
 
 const config = {
@@ -98,14 +103,29 @@ function ProgressPill() {
 
 function ChecklistRow({ index, label }: { index: number; label: string }) {
   const phase = (['item1', 'item2', 'item3', 'item4'] as const)[index];
+  const reduce = useReducedMotion();
   const checkFill = useTimelineValue(0, 1, { phase, duration: 350 });
   const checkScale = useTimelineValue(0, 1, { phase, offset: 100, duration: 300 });
   const textOpacity = useTimelineValue(1, 0.45, { phase, duration: 400 });
-  const rowY = useTimelineValue(4, 0, { phase, duration: 350 });
+  // Pop the row in as the stagger reaches it: a quick fade leads, while scale + y
+  // land on Loupe's settle curve for a subtle overshoot. Collapsed under reduced motion.
+  const rowOpacity = useTimelineValue(reduce ? 1 : 0, 1, { phase, duration: 220 });
+  const rowScale = useTimelineValue(reduce ? 1 : 0.96, 1, {
+    phase,
+    duration: 320,
+    ease: SETTLE_CURVE_FN,
+  });
+  const rowY = useTimelineValue(reduce ? 0 : 10, 0, {
+    phase,
+    duration: 320,
+    ease: SETTLE_CURVE_FN,
+  });
 
   return (
     <motion.div
       style={{
+        opacity: rowOpacity,
+        scale: rowScale,
         y: rowY,
         display: 'flex',
         alignItems: 'center',

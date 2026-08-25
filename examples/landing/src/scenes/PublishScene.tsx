@@ -70,6 +70,14 @@ function PublishCard() {
         { scaleX: 1, duration: 0.6, ease: 'power1.inOut' },
         1.6,
       );
+      // 1.9s : ~70% through the fill, the bar flips from accent to
+      // success green as the publish lands. Runs alongside the scaleX
+      // tween above (different property, same target — no conflict).
+      tl.to(
+        '.gsap-progress',
+        { backgroundColor: tokens.color.success, duration: 0.3, ease: 'power1.out' },
+        1.9,
+      );
       // 2.2 → 2.7s : "Published" badge pops
       tl.from(
         '.gsap-badge',
