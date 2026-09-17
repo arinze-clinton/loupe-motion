@@ -67,11 +67,16 @@ function effectiveOpacity(el: Element): number {
 }
 
 /**
- * Walk a scene root's descendants and find the deepest element whose
- * bounding rect contains (x, y) and which is visible. Used as a fallback
- * when `elementFromPoint` is defeated by a `pointer-events: none` ancestor.
+ * Walk an element's descendants and find the deepest one whose bounding
+ * rect contains (x, y) and which is visible.
+ *
+ * Used in two places: as a fallback when `elementFromPoint` is defeated by
+ * a `pointer-events: none` ancestor, and to descend into whatever the hit-
+ * stack returned (see `resolveTarget`).
+ *
+ * Exported for tests.
  */
-function manualHitTest(root: Element, x: number, y: number): Element | null {
+export function manualHitTest(root: Element, x: number, y: number): Element | null {
   const rootRect = root.getBoundingClientRect();
   if (x < rootRect.left || x > rootRect.right || y < rootRect.top || y > rootRect.bottom) {
     return null;
@@ -156,7 +161,22 @@ function ElementPicker({
       if (candidate.closest('[data-loupe-ui]')) continue;
       if (effectiveOpacity(candidate) < VISIBILITY_THRESHOLD) continue;
       if (!inAnySceneRoot(candidate)) continue;
-      return candidate;
+      // `elementsFromPoint` omits anything under a `pointer-events: none`
+      // ancestor, so the first in-scene hit can be an ANCESTOR of what the
+      // user is pointing at — usually the scene root, since the registry
+      // forces that one back to `auto`. The old code accepted it and
+      // stopped, which is why hovering a small item inside a decorative
+      // `pointer-events: none` wrapper highlighted the whole scene and the
+      // item itself could never be picked. The fallback below never
+      // rescued it either: it only runs when NOTHING in the stack is in a
+      // scene, and the scene root is.
+      //
+      // So descend. `manualHitTest` ignores pointer-events entirely and
+      // returns the smallest visible element containing the point, which
+      // is the same rule the browser would have used. It returns
+      // `candidate` itself when nothing deeper hits, so the common case is
+      // unchanged.
+      return manualHitTest(candidate, clientX, clientY) ?? candidate;
     }
 
     // Fallback: nothing in the hit-stack belonged to a scene. Likely an
