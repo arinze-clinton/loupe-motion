@@ -168,6 +168,10 @@ duration = (input[last] − input[0]) / 1000
 times[i] = (input[i] − input[0]) / (input[last] − input[0])
 ```
 
+Round `times` to 4 decimals. The example's `0.214` is shortened for reading; at these
+durations the difference is well under a millisecond, but the skill states the rule so
+an agent doesn't infer a precision convention from one example.
+
 Normalizing against `input[last]` alone drops the delay and starts the animation at the
 wrong moment. `initial` is required: without it Framer writes no inline value on the
 first render, so the element paints at its natural style and jumps to keyframe 0 once
@@ -250,6 +254,7 @@ conversion rules above don't achieve on their own. Also strip:
   element type. Replace it with that same element, carrying the consumer's own style
   and props across. Swapping it for a bare `<div>` silently changes both the tag and
   pointer-events.
+
 `usePhaseEnterKey` and `usePhaseFromTime` are **not** on this list — do not strip
 them. They carry behavior that has to be reconstructed, not deleted. See the refusal
 table.
@@ -304,7 +309,9 @@ are Loupe-authored, but a user may have edited theirs. The policy:
 - Differs → show which files differ, prompt defaulting to **yes**, since these are
   Loupe-authored files and the shipped version is the corrected one.
 - Back up to `<file>.loupe-backup` before overwriting, matching the convention
-  `bridge.ts` already uses and `uninstall` already restores from.
+  `bridge.ts` already uses. Note `uninstall` does *not* restore from `.loupe-backup`
+  generally — it works from two hardcoded discovery sets, neither of which covers
+  skills — so the backups have to be removed explicitly (see below).
 - `--force` skips the prompt; `--dry-run` prints what would change.
 
 Two supporting changes:
@@ -312,8 +319,11 @@ Two supporting changes:
 - `package.json` already ships the whole `skill` directory via `files`, so a new
   subdirectory needs no packaging change.
 - `loupe uninstall` hardcodes `.claude/skills/loupe/SKILL.md` in both
-  `LOUPE_AUTHORED_FILES` and `emptyDirs`. The second skill has to be added to both, or
-  uninstall stops being a clean exit ramp.
+  `LOUPE_AUTHORED_FILES` and `emptyDirs`. Both lists should be derived from the same
+  manifest the sync uses, so they can't drift — and they must include the
+  `.loupe-backup` siblings. `pruneEmptyDir` only removes a directory when it's empty,
+  so a leftover backup keeps the whole skill directory alive and uninstall stops being
+  a clean exit ramp.
 
 ## Verification
 

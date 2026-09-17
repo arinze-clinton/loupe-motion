@@ -3,6 +3,7 @@ import { init } from './commands/init.js';
 import { scan } from './commands/scan.js';
 import { refactor } from './commands/refactor.js';
 import { check } from './commands/check.js';
+import { skills } from './commands/skills.js';
 import { uninstall } from './commands/uninstall.js';
 import { LOUPE_VERSION } from './util.js';
 
@@ -23,6 +24,13 @@ async function main() {
     }
     case 'refactor':
       await refactor({ cwd: process.cwd() });
+      break;
+    case 'skills':
+      await skills({
+        cwd: process.cwd(),
+        force: rest.includes('--force'),
+        dryRun: rest.includes('--dry-run'),
+      });
       break;
     case 'check':
     case 'status':
@@ -63,6 +71,7 @@ ${kleur.bold('Usage')}
   loupe ${kleur.cyan('init --upgrade-demo')}  Rewrite a generated loupe-demo-scene.tsx to the latest template (with backup)
   loupe ${kleur.cyan('scan')} [--json]   Report which animations are timeline-bound
   loupe ${kleur.cyan('refactor')}        Interactive walk-through to make animations scrubbable (no AI needed)
+  loupe ${kleur.cyan('skills')}          Install or refresh the bundled Claude skills (--force, --dry-run)
   loupe ${kleur.cyan('check')}           Show installed version + check for updates
   loupe ${kleur.cyan('uninstall')}       Remove Loupe cleanly (dep + generated files)
   loupe ${kleur.cyan('--version')}       Print version

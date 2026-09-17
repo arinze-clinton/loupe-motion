@@ -10,6 +10,7 @@ import {
   warnOnInvokerMismatch,
 } from '../util.js';
 import { findBridgeReverts } from '../bridge.js';
+import { LOUPE_SKILL_FILES, BACKUP_SUFFIX } from '../skills.js';
 
 /**
  * `loupe uninstall` — clean exit ramp.
@@ -31,9 +32,19 @@ type UninstallOptions = {
   yes?: boolean;
 };
 
+/**
+ * Everything `init` / `skills` can write into a host project.
+ *
+ * Derived from the same manifest the skill sync uses so the two can't
+ * drift, and includes each skill's `.loupe-backup` sibling: `uninstall`
+ * does NOT restore from `.loupe-backup` generally (that's limited to the
+ * layout and bridge discovery sets), and `pruneEmptyDir` only removes a
+ * directory once it's empty — so a leftover backup would keep the whole
+ * skill directory alive.
+ */
 const LOUPE_AUTHORED_FILES = [
   'loupe.example.tsx',
-  '.claude/skills/loupe/SKILL.md',
+  ...LOUPE_SKILL_FILES.flatMap((f) => [f.dest, `${f.dest}${BACKUP_SUFFIX}`]),
 ];
 
 export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
@@ -102,11 +113,10 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
     );
   }
   const emptyDirs = [
-    '.claude/skills/loupe',
+    ...new Set(LOUPE_SKILL_FILES.map((f) => path.dirname(f.dest))),
   ];
   for (const d of emptyDirs) {
     console.log(kleur.dim(`    (+ empty parent dir ${d} if left behind)`));
-    break;
   }
   console.log();
 
@@ -194,7 +204,12 @@ export async function uninstall({ cwd, yes }: UninstallOptions): Promise<void> {
   }
 
   // 5. Prune empty Loupe parent dirs so the tree isn't littered.
-  await pruneEmptyDir(path.join(cwd, '.claude', 'skills', 'loupe'));
+  // Every skill directory, not just the first — each skill has its own,
+  // and a leftover empty one is the litter this command exists to avoid.
+  for (const dir of new Set(LOUPE_SKILL_FILES.map((f) => path.dirname(f.dest)))) {
+    await pruneEmptyDir(path.join(cwd, dir));
+  }
+  await pruneEmptyDir(path.join(cwd, '.claude', 'skills'));
 
   console.log();
   console.log(kleur.green('  Loupe removed from this project.'));

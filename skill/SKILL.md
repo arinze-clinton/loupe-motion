@@ -69,12 +69,20 @@ For each fire-and-forget animation, the rough recipe is:
 **Framer Motion `<motion.x animate={...}>`:**
 ```tsx
 // Before
-<motion.div animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.2 }} />
+<motion.div animate={{ opacity: 1 }} transition={{ duration: 0.5, delay: 0.2, ease: [0.4, 0, 0.2, 1] }} />
 
 // After
-const opacity = useTimelineValue(0, 1, { phase: 'enter', offset: 200, duration: 500 });
+const opacity = useTimelineValue(0, 1, {
+  phase: 'enter', offset: 200, duration: 500, ease: cubicBezier(0.4, 0, 0.2, 1),
+});
 <motion.div style={{ opacity }} />
 ```
+
+**Carry the curve.** `useTimelineValue` defaults `ease` to `HOUSE_CURVE_FN`, and a
+Framer `transition` with no `ease` uses Framer's own default. They are different
+curves, so dropping it either way silently changes how the animation looks. If the
+source has no explicit easing, say which default you're adopting instead of leaving
+it implicit.
 
 **GSAP `gsap.to/from/timeline`:**
 Don't rewrite — bridge. Use the `@arinze-clinton/loupe/gsap` adapter. It builds your timeline paused and drives its playhead from Loupe's `time`, so the existing GSAP authoring stays intact and becomes scrubbable.
@@ -119,6 +127,16 @@ The hardest case. Either:
 
 **CSS `transition:`:**
 If the property is animated by interaction (hover, focus), leave it — Loupe is for authored motion, not state-based UI feedback. If it's animating on mount/scroll, refactor to a Framer transform.
+
+### B2. User is done tweaking and wants a production version
+
+Use the **`loupe-prepare-for-production`** skill. It converts a finished timeline-bound
+scene back to plain, dependency-free animation code and writes it wherever the user
+says. Don't improvise this conversion from the table above — the reverse direction has
+traps (curves, `loop` defaults, non-literal phases, stripping `SceneRoot`) that the
+dedicated skill documents.
+
+If that skill isn't installed, `npx loupe skills` installs it.
 
 ### C. User wants to add a new animation
 
