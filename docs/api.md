@@ -126,6 +126,38 @@ type PhaseRange = {
 };
 ```
 
+### `<SceneRoot>`
+
+The recommended wrapper for an instrumented scene. Registers itself with the scene-ref
+context and manages `pointer-events` so the element picker can hit-test the scene —
+`document.elementFromPoint` sees straight through a `pointer-events: none` ancestor and
+would pick the page underneath.
+
+```tsx
+<SceneRoot as="section" style={{ padding: 24 }}>
+  <YourAnimatedThing />
+</SceneRoot>
+```
+
+| Prop | Meaning |
+|---|---|
+| `as` | Element type to render. Defaults to `div`. |
+| `style`, `className`, `...rest` | Passed through to that element. |
+
+**Pointer-events.** With Loupe mounted, the root is forced to `pointer-events: auto` so
+the picker works — that overrides whatever you set. With no Loupe above (production),
+the default is `none`, which is what a decorative overlay wants. If your scene has
+interactive content, say so and it's honored:
+
+```tsx
+<SceneRoot style={{ pointerEvents: 'auto' }}>
+  <button onClick={…}>Still clickable in production</button>
+</SceneRoot>
+```
+
+Before 0.6.1 that opt-out didn't exist — the root was always `none` in production, so a
+scene with buttons worked all through development and went dead once shipped.
+
 ### `useSceneRootRef(): React.RefObject<HTMLElement | null>`
 
 Get the ref the registry uses to draw the scene flash overlay when the user picks this scene from the dropdown. Attach it to your scene's outermost element.

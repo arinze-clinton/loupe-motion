@@ -7,12 +7,18 @@ import { useOptionalSceneRootRef } from './registry';
  * Bakes in two invariants consumers used to re-derive by hand:
  *   1. Registers itself with the scene-ref context so registry features
  *      (flash, scroll-to, picker fallback) can locate the scene.
- *   2. Pointer-events: auto whenever Loupe is mounted; pointer-events:
- *      none otherwise. `document.elementFromPoint` sees through any
- *      ancestor with `pointer-events: none`, so a hardcoded `none` on
- *      the scene root makes the picker pick through to the page
- *      underneath. We restore production click-through automatically
- *      when no `<LoupeRegistryProvider>` is mounted above.
+ *   2. Pointer-events: auto whenever Loupe is mounted, so the picker can
+ *      hit-test the scene — `document.elementFromPoint` sees through any
+ *      ancestor with `pointer-events: none` and would pick the page
+ *      underneath. With no `<LoupeRegistryProvider>` above, the default
+ *      is `none`, which is what a decorative overlay wants in production.
+ *
+ *      A scene with interactive content opts out by saying so:
+ *
+ *        <SceneRoot style={{ pointerEvents: 'auto' }}>
+ *
+ *      That is honored in production and still overridden to `auto` in
+ *      dev, where the picker needs it anyway.
  */
 
 interface SceneRootProps {
@@ -43,11 +49,19 @@ export const SceneRoot = forwardRef<HTMLElement, SceneRootProps>(function SceneR
       (forwardedRef as React.MutableRefObject<HTMLElement | null>).current = node;
   };
 
-  // Loupe's pointerEvents goes LAST so a consumer style prop can't
-  // accidentally override the picker-rescue behavior.
+  // With Loupe mounted, `auto` wins over whatever the consumer asked for:
+  // `document.elementFromPoint` sees straight through a `pointer-events:
+  // none` ancestor and picks the page underneath, so a hit-testable root
+  // is non-negotiable for the picker.
+  //
+  // With no Loupe above — production — an explicit choice is honored.
+  // The `none` fallback is right for a decorative overlay and wrong for a
+  // scene with buttons in it, and before this there was no way to say so:
+  // pointerEvents was applied last unconditionally, so a consumer asking
+  // for `auto` was silently overridden and shipped a dead subtree.
   const mergedStyle: CSSProperties = {
     ...style,
-    pointerEvents: loupeActive ? 'auto' : 'none',
+    pointerEvents: loupeActive ? 'auto' : style?.pointerEvents ?? 'none',
   };
 
   return (

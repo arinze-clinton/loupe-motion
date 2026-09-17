@@ -89,3 +89,49 @@ describe('SceneRoot', () => {
     expect(root.style.pointerEvents).toBe('auto');
   });
 });
+
+/**
+ * A scene with buttons in it has to be able to ship.
+ *
+ * `SceneRoot` applied its own `pointerEvents` last, unconditionally, so a
+ * consumer asking for `auto` was silently overridden — and since the
+ * override only bites when no registry is mounted, the subtree worked all
+ * the way through development and went dead in production. An explicit
+ * choice is now honored there.
+ */
+describe('SceneRoot — explicit pointer-events', () => {
+  it('honors an explicit pointerEvents in production', () => {
+    const { container } = render(
+      <SceneRoot style={{ pointerEvents: 'auto' }}>
+        <button type="button">click me</button>
+      </SceneRoot>,
+    );
+    const root = container.querySelector('[data-loupe-scene-root]') as HTMLElement;
+    expect(root.style.pointerEvents).toBe('auto');
+  });
+
+  it('still defaults to click-through when the consumer says nothing', () => {
+    const { container } = render(
+      <SceneRoot style={{ background: 'red' }}>
+        <div>decorative</div>
+      </SceneRoot>,
+    );
+    const root = container.querySelector('[data-loupe-scene-root]') as HTMLElement;
+    expect(root.style.pointerEvents).toBe('none');
+    expect(root.style.background).toBe('red');
+  });
+
+  it('overrides an explicit none while Loupe is mounted, so the picker works', () => {
+    const { container } = render(
+      <LoupeRegistryProvider>
+        <TimelineProvider config={CONFIG}>
+          <SceneRoot style={{ pointerEvents: 'none' }}>
+            <div>child</div>
+          </SceneRoot>
+        </TimelineProvider>
+      </LoupeRegistryProvider>,
+    );
+    const root = container.querySelector('[data-loupe-scene-root]') as HTMLElement;
+    expect(root.style.pointerEvents).toBe('auto');
+  });
+});

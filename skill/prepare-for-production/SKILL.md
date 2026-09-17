@@ -204,10 +204,21 @@ is not valid GSAP.
 conversion rules above don't achieve that on their own.
 
 - `<TimelineProvider>` — pure scaffolding. Remove it and its config object.
-- `<SceneRoot>` — **not** an inert wrapper. It merges `pointerEvents` after the
-  consumer's style, emits `data-loupe-scene-root`, and takes an `as` prop for the
-  element type. Replace it with that same element, carrying the consumer's own style
-  and props across. A bare `<div>` silently changes both the tag and pointer-events.
+- `<SceneRoot>` — **not** an inert wrapper. It emits `data-loupe-scene-root`, takes an
+  `as` prop for the element type, and applies `pointerEvents`. Replace it with that
+  same element (`as` if given, otherwise `div`), carrying the consumer's style and
+  props across.
+
+  **Pointer-events needs a decision, not a default.** With no Loupe mounted,
+  `SceneRoot` renders `pointer-events: none` unless the scene set it explicitly. That's
+  right for a decorative overlay and wrong for anything with a button in it. So:
+
+  - Scene set `pointerEvents` explicitly → carry that value across. It's already a
+    deliberate choice.
+  - Scene said nothing → **ask** whether it's decorative. Carrying `none` silently
+    kills a scene with interactive content; dropping it makes a decorative overlay
+    start eating clicks on whatever sits underneath. Both failures are invisible until
+    someone tries to click. Do not pick for them.
 
 `usePhaseEnterKey` and `usePhaseFromTime` are **not** on this list. Do not strip them —
 see the table.
