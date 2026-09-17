@@ -70,6 +70,25 @@ Run **`npx loupe refactor`** — Loupe walks you through each fire-and-forget an
 
 Using Claude, Cursor, or Copilot? `npx loupe init` installed a skill that lets you ask in plain English: *"audit my animations"*, *"make this scrubbable"*. The agent does the same walkthrough.
 
+## Done tweaking? Hand it off
+
+When an animation is finished, the timeline binding that made it scrubbable is
+scaffolding the production copy doesn't need. Ask your agent:
+
+> *"prepare the hero animation for production"*
+
+It converts the scene back to plain animation code with no Loupe dependency, asks where
+it should go, and writes it there. Framer stays Framer, GSAP stays GSAP. Your Loupe
+version stays the master copy — tweak, re-export, replace.
+
+It refuses rather than guesses. Conditional values, hand-written easing curves and
+computed phases are reported back untouched instead of being quietly resolved to a
+number that looks plausible and isn't.
+
+```bash
+npx loupe skills   # installs or refreshes the bundled agent skills
+```
+
 ## The idea
 
 Every animation is a function of time. Loupe owns the time.
