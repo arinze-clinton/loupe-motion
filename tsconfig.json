@@ -16,7 +16,19 @@
     "declaration": true,
     "declarationMap": true,
     "forceConsistentCasingInFileNames": true,
-    "types": ["node"]
+    "types": ["node"],
+    // The /gsap, /waapi and /lottie adapters import the package by its own
+    // name so the built subpath bundles share one TimelineContext with the
+    // main bundle (see tsup.config.ts). Node and TS resolve that by
+    // self-reference, through this package's own `exports` — which point at
+    // `dist/`. That makes `tsc --noEmit` silently depend on a prior build:
+    // it passes locally where dist/ is lying around and fails on a clean
+    // clone or in CI, where typecheck runs before build. Mapping the name to
+    // source removes the dependency. tsup still externalises the package at
+    // bundle time, so the runtime sharing is unaffected.
+    "paths": {
+      "@arinze-clinton/loupe": ["./src/index.ts"]
+    }
   },
   "include": ["src/**/*", "cli/**/*"],
   "exclude": ["node_modules", "dist", "examples"]
