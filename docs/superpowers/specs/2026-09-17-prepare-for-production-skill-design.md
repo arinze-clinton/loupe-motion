@@ -1,8 +1,8 @@
 # Prepare for production — design
 
 **Date:** 2026-09-17
-**Status:** Approved for planning
-**Scope:** One new agent skill. No runtime changes, no CLI changes, no new config.
+**Status:** Approved for planning (revised after spec review)
+**Scope:** One new agent skill, plus a small CLI command to deliver it.
 
 ## The problem
 
@@ -28,17 +28,11 @@ regenerate it and replace, don't edit it in place.
 
 ### What we are not building
 
-- No build step, bundler plugin, or compile pipeline
-- No panel editing or write-back
-- No CSS, Lottie, or video output
-- No new `SceneConfig` fields
-- No changes to how Loupe runs today
-
-These were all considered and cut. Each solves a different problem than the one above.
+No build step, bundler plugin, or codegen engine. No panel editing or write-back. No
+CSS, Lottie, or video output. No new `SceneConfig` fields. No changes to how Loupe
+runs today. Each of these was considered and cut; each solves a different problem.
 
 ## How it works
-
-The skill is a markdown file the agent follows. There is no generator to maintain.
 
 ```
 You:    prepare the hero animation for production
@@ -59,22 +53,24 @@ Agent:  Done. Replaced the motion block at Hero.tsx:23. Three values converted.
 
 1. **Locate the scene.** Find the `<TimelineProvider>` and its config. If the project
    has more than one scene and the request is ambiguous, ask which.
-2. **Resolve the timing.** `phaseOrder` + `phaseDurations` give each phase an absolute
-   start. Every value's window falls out of that (see *Conversion rules*).
-3. **Ask where it goes.** Destination file, and whether it replaces an existing
+2. **Identify the library.** Framer values, GSAP adapter, WAAPI adapter, Lottie, or
+   raw `useTransform`. Steps 3–4 branch on this — GSAP and WAAPI scenes keep their
+   timing inside the build function and skip the arithmetic entirely.
+3. **Resolve the timing** (Framer and raw `useTransform` only).
+4. **Ask where it goes.** Destination file, and whether it replaces an existing
    animation or lands fresh. Never guess a destination.
-4. **Convert.** Apply the reverse mapping for the library the scene uses.
-5. **Write it.** Into the destination the user named.
-6. **Report.** What converted, what didn't and why, what to check.
+5. **Convert**, including stripping the scene wrapper.
+6. **Write it** into the destination the user named.
+7. **Report.** What converted, what didn't and why, what to check.
 
-Step 3 is the part that makes this a skill rather than a CLI command. The agent has
-the conversation; the user never thinks about paths or formats.
+Step 4 is what makes this a skill rather than a CLI command. The agent has the
+conversation; the user never thinks about paths or formats.
 
 ## Conversion rules
 
 ### Timing arithmetic
 
-`useTimelineValue` resolves to a window. Reading [hooks.ts](../../../src/runtime/hooks.ts):
+From [hooks.ts](../../../src/runtime/hooks.ts):
 
 ```
 phase given:   start = phaseStart + (offset ?? 0)
@@ -83,8 +79,16 @@ no phase:      start = startMs ?? 0
                end   = endMs ?? (duration !== undefined ? start + duration : totalDuration)
 ```
 
-`phaseStart` is the sum of all prior `phaseDurations`. The hook clamps, so the value
-holds at `from` before the window and `to` after it.
+`phaseStart` is the sum of `phaseDurations` for the entries **in `phaseOrder`** that
+precede the target phase, treating a missing key as 0. Summing `Object.values()` gives
+the wrong answer whenever the object carries keys not in `phaseOrder`.
+
+Two traps worth stating in the skill file:
+
+- When `duration` is omitted, `offset` is **not** added to the end — the window runs to
+  `phaseEnd`.
+- The JSDoc on `duration` says "overrides endMs," but the expression gives `endMs`
+  priority. Follow the code, not the comment.
 
 Worked example, config `{ phaseOrder: ['enter','settle'], phaseDurations: { enter: 600, settle: 400 } }`:
 
@@ -95,8 +99,6 @@ useTimelineValue(0, 1, { phase: 'settle', offset: 100, duration: 200 })
 
 ### Framer Motion
 
-Reverse of the table already in `skill/SKILL.md`:
-
 ```tsx
 // Timeline-bound
 const opacity = useTimelineValue(0, 1, { phase: 'enter', offset: 200, duration: 500 });
@@ -106,127 +108,205 @@ const opacity = useTimelineValue(0, 1, { phase: 'enter', offset: 200, duration: 
 <motion.div
   initial={{ opacity: 0 }}
   animate={{ opacity: 1 }}
-  transition={{ delay: 0.2, duration: 0.5 }}
+  transition={{ delay: 0.2, duration: 0.5, ease: [0.59, 0.01, 0.4, 0.98] }}
 />
 ```
 
-Several values on one element get per-property transitions, which Framer supports
-directly:
+**The curve is not optional.** `ease` defaults to `HOUSE_CURVE_FN`, so a converted
+transition that omits it silently swaps a near-symmetric in-out for Framer's own
+default. Every emitted transition carries an explicit `ease`. The forward mapping in
+`skill/SKILL.md` omits it too, and should be corrected in the same change — reversing a
+lossy table doesn't produce a lossless one.
+
+Several values on one element get per-property transitions, each with its own curve:
 
 ```tsx
 transition={{
-  opacity: { delay: 0.7, duration: 0.2 },
-  y:       { delay: 0.6, duration: 0.3 },
+  opacity: { delay: 0.7, duration: 0.2, ease: [0.59, 0.01, 0.4, 0.98] },
+  y:       { delay: 0.6, duration: 0.3, ease: [0.175, 0.885, 0.32, 1.275] },
 }}
 ```
 
-Framer holds at `initial` before the delay and at `animate` after, which matches the
-hook's clamping. Milliseconds become seconds.
+Milliseconds become seconds. Framer holds at `initial` before the delay and at
+`animate` after, which matches the hook's clamping — Framer clamps the input before
+easing, so overshoot curves like `SETTLE_CURVE_FN` survive the conversion intact.
+
+Two windows break that equivalence and need guards:
+
+- **Zero-length** (`start === end`, which happens when a phase in `phaseOrder` has no
+  duration entry): the hook hard-steps. Emit `duration: 0`, or Framer applies its
+  ~0.3s default and invents a fade that was never there.
+- **Inverted** (`start > end`, reachable when `offset` exceeds the phase duration and
+  no `duration` is set): the hook plays the value backwards. Stop and report it rather
+  than emitting a negative duration.
+
+### Raw `useTransform`
+
+`useTimelineTime()` + `useTransform` is a documented pattern and `src/scenes/PaperScene.tsx`
+is written entirely that way, so the skill cannot ignore it.
+
+Two-stop ranges convert exactly like `useTimelineValue` — the input range is already
+absolute milliseconds, so no phase arithmetic is needed.
+
+Multi-stop ranges map to Framer keyframe arrays with a normalized `times`:
+
+```tsx
+useTransform(time, [0, 300, 600], [0, 1, 0])
+// → animate={{ opacity: [0, 1, 0] }}
+//   transition={{ duration: 0.6, times: [0, 0.5, 1], ease: [...] }}
+```
+
+A `useTransform` whose input isn't the timeline's `time`, or whose output isn't
+numeric, is out of scope — refuse it.
 
 ### GSAP
 
 The adapter never rewrote the user's GSAP — `useLoupeGsap({ build })` builds their
-timeline paused and drives its playhead. Reversing is removing the wrapper and letting
-GSAP run its own clock:
+timeline paused and drives its playhead. Reversing removes the wrapper and lets GSAP
+run its own clock:
 
 ```tsx
-// Timeline-bound
-useLoupeGsap({ scope: ref.current, deps: [ref.current], build: (gsap) => gsap.timeline()... });
-
-// Production — same build body, GSAP plays it
 useEffect(() => {
-  const ctx = gsap.context(() => { /* the same timeline */ }, ref);
+  const ctx = gsap.context(() => { /* the same timeline body */ }, ref);
   return () => ctx.revert();
-}, []);
+}, [/* the adapter's deps */]);
 ```
 
-Nothing about the animation is recomputed. The build function is already production
-code.
+Carry over rather than assume:
+
+- A real `import { gsap } from 'gsap'` — the adapter supplied it by dynamic import, so
+  the build body's parameter name may be anything.
+- The adapter's `deps`, not a hardcoded `[]`.
+- `scope` was passed as `ref.current`; `gsap.context` takes the ref itself.
+- If the consumer reads the returned `{ timeline }`, that binding has to survive.
 
 ### WAAPI
 
-Same shape — `useLoupeWaapi({ build })` pauses the animation and writes `currentTime`.
-Reversing means calling `element.animate(...)` directly in an effect with the same
-keyframes and options. Keep `fill: 'both'` when the element should hold its end state.
+Same shape. Call `element.animate(...)` directly with the same keyframes and options —
+**and cancel on teardown**:
+
+```tsx
+useEffect(() => {
+  const anim = el.current?.animate(keyframes, options);
+  return () => anim?.cancel();
+}, [/* deps */]);
+```
+
+The adapter cancels for a reason. Without it, StrictMode's double-invoke leaves two
+composited animations on the element and every remount adds another.
 
 ### Curves
-
-`ease` defaults to `HOUSE_CURVE_FN`. The two exported constants map to known control
-points, from [phases.ts](../../../src/runtime/phases.ts):
 
 | Constant | Control points |
 |---|---|
 | `HOUSE_CURVE_FN` | `[0.59, 0.01, 0.4, 0.98]` |
 | `SETTLE_CURVE_FN` | `[0.175, 0.885, 0.32, 1.275]` |
 
-An inline `cubicBezier(a, b, c, d)` is read directly. Framer accepts the array form as
-`ease`, and it is also a valid CSS `cubic-bezier()`.
+An inline `cubicBezier(a, b, c, d)` is read directly. Framer accepts the array form,
+and it is also a valid CSS `cubic-bezier()`.
 
 ### Playback
 
-Loupe loops — the rAF tick wraps at total duration. Production output plays once on
-mount, which is what the destination almost always wants. The agent states this in its
-report rather than asking up front; if the animation genuinely loops, the user says so
-and the agent adds `repeat: Infinity` (or the GSAP/WAAPI equivalent).
+For Framer scenes, Loupe's own loop is a review artifact — production output plays once
+on mount. The agent states this in its report; if the animation genuinely loops, the
+user says so.
+
+**For GSAP and WAAPI it is not an artifact.** Both adapters expose a `loop` option that
+**defaults to true**, and each wraps at the *animation's own* duration rather than the
+scene's — a 1.2s GSAP timeline inside a 3s scene runs two and a half times per pass. So:
+
+- `loop: false` in source is an explicit clamp. Honor it silently.
+- Default or `loop: true` is a real repeat. Surface it and ask.
+
+GSAP's infinite repeat is `repeat: -1`. `repeat: Infinity` is Framer's spelling and is
+not valid GSAP — the skill states both so the agent doesn't guess.
+
+### The scene wrapper
+
+"Dependency-free" means the `@arinze-clinton/loupe` import is gone, which the
+conversion rules above don't achieve on their own. Also strip:
+
+- `<TimelineProvider>` — pure scaffolding, remove it and its config object.
+- `<SceneRoot>` — **not** an inert wrapper. It merges `pointerEvents` after the
+  consumer's style, emits `data-loupe-scene-root`, and takes an `as` prop for the
+  element type. Replace it with that same element, carrying the consumer's own style
+  and props across. Swapping it for a bare `<div>` silently changes both the tag and
+  pointer-events.
+- Any `usePhaseEnterKey` / `usePhaseFromTime` usage — see the refusal table.
 
 ## What the skill must refuse to guess
 
-This list is the point of the skill. An agent that quietly invents a number is worse
+This table is the point of the skill. An agent that quietly invents a number is worse
 than no skill.
 
 | Case | Behavior |
 |---|---|
 | Conditional `from`/`to` — e.g. `reduce ? 1 : 0` | Keep the conditional in the output. Don't collapse it to one branch. |
-| Hand-written easing function (not `cubicBezier`) | Stop. Report it. Offer to keep the import or sample it into keyframe stops, user's choice. |
-| Values from props, state, or computed expressions | Stop and report. Don't inline a value observed at one moment. |
-| Lottie scenes | Already its own format. Remove the Loupe driving, keep the player. |
+| Non-literal `phase` — a variable, prop, or computed key | Resolve each call site separately. One component rendered N times with N phases has N different delays. Never apply one instance's timing to all of them. |
+| Hand-written easing function (not `cubicBezier`) | Stop. Report it. Offer to keep the import or sample it into stops, user's choice. |
+| `from`/`to` from props, state, or computed expressions | Stop and report. Don't inline a value observed at one moment. |
+| Inverted window (`start > end`) | Stop and report. Never emit a negative duration. |
+| `useTransform` not reading the timeline's `time`, or non-numeric output | Out of scope. Refuse. |
+| `usePhaseEnterKey` / `usePhaseFromTime` | Stop. It exists to re-fire one-shot effects per loop pass; a `useEffect(…, [])` reversal loses the re-trigger, and the phase it keys on encodes a delay that has to be computed. |
+| Lottie via `useLoupeLottie` | The hook *is* the player — it hardcodes `autoplay: false, loop: true` inside `loadAnimation`. Rewrite the call; don't delete a wrapper that isn't there. |
 | Scene whose config isn't a literal object | Stop — the timing can't be resolved statically. |
 | Destination file unclear or ambiguous | Ask. Never pick a path. |
 
 In every case: convert what's convertible, leave the rest untouched, and say plainly
 what was left and why.
 
-## Where the skill lives
+## Where the skill lives, and how it reaches people
 
 A second skill directory, not a section in the existing `SKILL.md`:
 
 - Source: `skill/prepare-for-production/SKILL.md`
 - Installed to: `.claude/skills/loupe-prepare-for-production/SKILL.md`
 
-Two reasons. It gets its own trigger phrases, so "prepare for production" reaches it
-directly instead of depending on the agent reading far into a long file. And `loupe
-init` installs with `writeIfMissing`, so existing users — who already have a
-`SKILL.md` on disk — would never receive an edit to that file, but will receive a new
-one.
+The reason is trigger phrases — "prepare for production" reaches a dedicated skill
+directly, instead of depending on the agent reading far into a long file.
 
-`package.json` already ships the whole `skill` directory via `files`, so a new
-subdirectory needs no packaging change. `init` needs to copy the second skill
-alongside the first.
+**Delivery needs a CLI addition, which is a scope change from the original plan.**
+`loupe init` returns early for anyone who already has Loupe in `package.json`, behind
+a confirm that defaults to no. Existing users — the entire current install base — get
+nothing from `init`, new directory or not. Adding `npx loupe skills` to write or
+refresh skill files regardless of install state is the smallest honest fix. It's one
+command reusing the copy logic `init` already has.
+
+Two supporting changes:
+
+- `package.json` already ships the whole `skill` directory via `files`, so a new
+  subdirectory needs no packaging change.
+- `loupe uninstall` hardcodes `.claude/skills/loupe/SKILL.md` in both
+  `LOUPE_AUTHORED_FILES` and `emptyDirs`. The second skill has to be added to both, or
+  uninstall stops being a clean exit ramp.
 
 ## Verification
 
 The report ends with a concrete check: *"scrub `hero-entrance` to 320ms in Loupe and
-compare."* Both versions are running the same motion at the same moment, so they
-should look identical. That gives the user — and the agent — a way to confirm the
-conversion rather than trust it.
+compare."* Both versions run the same motion at the same moment, so they should look
+identical. That gives the user — and the agent — a way to confirm the conversion
+rather than trust it.
 
 ## Testing
 
-The conversion is instructions, not code, so the tests are on the arithmetic and the
-fixtures rather than on a generator.
+The conversion is instructions, not code, so the tests cover the arithmetic and the
+fixtures rather than a generator.
 
-- Unit tests for window resolution: phase + offset + duration, phase with no duration,
-  `startMs`/`endMs`, no phase at all. These pin the numbers the skill tells the agent
-  to compute.
+- Unit tests for window resolution: phase + offset + duration, phase with no duration
+  (offset not added to the end), `startMs`/`endMs`, `endMs` beating `duration`, no
+  phase at all, zero-length window, inverted window. These pin the numbers the skill
+  tells the agent to compute.
 - Fixture pairs under `test/fixtures/prepare-for-production/`: a timeline-bound scene
-  and its expected production form, for Framer, GSAP, and WAAPI. These are what the
-  skill's examples are checked against, and what catches drift if `useTimelineValue`
-  ever changes.
-- One fixture per refusal case, asserting the documented behavior is what the skill
-  actually describes.
+  and its expected production form, for Framer, GSAP, WAAPI, and raw `useTransform`
+  (two-stop and multi-stop). These are what the skill's examples are checked against,
+  and what catches drift if `useTimelineValue` ever changes.
+- One fixture per refusal row, asserting the documented behavior is what the skill
+  actually describes. The non-literal `phase` case should use the shape from
+  `examples/landing/src/scenes/HeroScene.tsx` — one component, four instances, four
+  different start times.
 
 ## Open questions
 
-- Does `_debugSource` still populate on React 19? The skill doesn't depend on it —
-  the agent reads source directly — but the annotation flow does, and it's worth
+- Does `_debugSource` still populate on React 19? The skill doesn't depend on it — the
+  agent reads source directly — but the annotation flow does, and it's worth
   confirming separately.
