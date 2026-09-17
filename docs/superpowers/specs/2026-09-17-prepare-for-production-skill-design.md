@@ -1,7 +1,7 @@
 # Prepare for production — design
 
 **Date:** 2026-09-17
-**Status:** Approved for planning (revised after spec review)
+**Status:** Approved for planning (revised after two spec-review passes)
 **Scope:** One new agent skill, plus a small CLI command to deliver it.
 
 ## The problem
@@ -133,12 +133,14 @@ easing, so overshoot curves like `SETTLE_CURVE_FN` survive the conversion intact
 
 Two windows break that equivalence and need guards:
 
-- **Zero-length** (`start === end`, which happens when a phase in `phaseOrder` has no
-  duration entry): the hook hard-steps. Emit `duration: 0`, or Framer applies its
-  ~0.3s default and invents a fade that was never there.
-- **Inverted** (`start > end`, reachable when `offset` exceeds the phase duration and
-  no `duration` is set): the hook plays the value backwards. Stop and report it rather
-  than emitting a negative duration.
+- **Zero-length — key on `start === end`.** The hook hard-steps. Emit `duration: 0`, or
+  Framer applies its ~0.3s default and invents a fade that was never there. Causes
+  include a phase in `phaseOrder` with no duration entry, an explicit `duration: 0`,
+  and `startMs === endMs`.
+- **Inverted — key on `start > end`.** The hook plays the value backwards. Stop and
+  report rather than emitting a negative duration. Causes include an `offset` exceeding
+  the phase duration with no `duration` set, a negative `duration`, and `endMs` below
+  `startMs`.
 
 ### Raw `useTransform`
 
@@ -151,10 +153,26 @@ absolute milliseconds, so no phase arithmetic is needed.
 Multi-stop ranges map to Framer keyframe arrays with a normalized `times`:
 
 ```tsx
-useTransform(time, [0, 300, 600], [0, 1, 0])
-// → animate={{ opacity: [0, 1, 0] }}
-//   transition={{ duration: 0.6, times: [0, 0.5, 1], ease: [...] }}
+useTransform(time, [400, 550, 1100], [0, 1, 0])
+// → initial={{ opacity: 0 }}
+//   animate={{ opacity: [0, 1, 0] }}
+//   transition={{ delay: 0.4, duration: 0.7, times: [0, 0.214, 1], ease: [...] }}
 ```
+
+The arithmetic, stated explicitly because the input range rarely starts at zero —
+`PaperScene.tsx` uses `[400, 1100]` and `[400, 550]`:
+
+```
+delay    = input[0] / 1000
+duration = (input[last] − input[0]) / 1000
+times[i] = (input[i] − input[0]) / (input[last] − input[0])
+```
+
+Normalizing against `input[last]` alone drops the delay and starts the animation at the
+wrong moment. `initial` is required: without it Framer writes no inline value on the
+first render, so the element paints at its natural style and jumps to keyframe 0 once
+the animation starts. The hook holds at `from` from frame 0, so omitting `initial`
+diverges visibly — and more so under SSR.
 
 A `useTransform` whose input isn't the timeline's `time`, or whose output isn't
 numeric, is out of scope — refuse it.
@@ -232,7 +250,9 @@ conversion rules above don't achieve on their own. Also strip:
   element type. Replace it with that same element, carrying the consumer's own style
   and props across. Swapping it for a bare `<div>` silently changes both the tag and
   pointer-events.
-- Any `usePhaseEnterKey` / `usePhaseFromTime` usage — see the refusal table.
+`usePhaseEnterKey` and `usePhaseFromTime` are **not** on this list — do not strip
+them. They carry behavior that has to be reconstructed, not deleted. See the refusal
+table.
 
 ## What the skill must refuse to guess
 
@@ -242,7 +262,7 @@ than no skill.
 | Case | Behavior |
 |---|---|
 | Conditional `from`/`to` — e.g. `reduce ? 1 : 0` | Keep the conditional in the output. Don't collapse it to one branch. |
-| Non-literal `phase` — a variable, prop, or computed key | Resolve each call site separately. One component rendered N times with N phases has N different delays. Never apply one instance's timing to all of them. |
+| Non-literal `phase` — a variable, prop, or computed key | Resolve per rendered instance, not per call site. One call site rendered N times with an index-derived phase has N different delays. Never apply one instance's timing to all of them. |
 | Hand-written easing function (not `cubicBezier`) | Stop. Report it. Offer to keep the import or sample it into stops, user's choice. |
 | `from`/`to` from props, state, or computed expressions | Stop and report. Don't inline a value observed at one moment. |
 | Inverted window (`start > end`) | Stop and report. Never emit a negative duration. |
@@ -268,9 +288,24 @@ directly, instead of depending on the agent reading far into a long file.
 **Delivery needs a CLI addition, which is a scope change from the original plan.**
 `loupe init` returns early for anyone who already has Loupe in `package.json`, behind
 a confirm that defaults to no. Existing users — the entire current install base — get
-nothing from `init`, new directory or not. Adding `npx loupe skills` to write or
-refresh skill files regardless of install state is the smallest honest fix. It's one
-command reusing the copy logic `init` already has.
+nothing from `init`, new directory or not. `npx loupe skills` writes or refreshes skill
+files regardless of install state.
+
+Install state is only half the problem. `init` copies through `writeIfMissing`, which
+prompts `"SKILL.md exists — overwrite?"` defaulting to **no**. Reusing it unchanged
+would deliver the new skill (nothing sits at that path yet) while silently failing to
+deliver the corrected forward table into the `SKILL.md` that's already on disk — the
+same failure one level down.
+
+So `loupe skills` needs its own overwrite policy, and the tension is real: skill files
+are Loupe-authored, but a user may have edited theirs. The policy:
+
+- Compare on disk against the shipped version. Identical or missing → write, no prompt.
+- Differs → show which files differ, prompt defaulting to **yes**, since these are
+  Loupe-authored files and the shipped version is the corrected one.
+- Back up to `<file>.loupe-backup` before overwriting, matching the convention
+  `bridge.ts` already uses and `uninstall` already restores from.
+- `--force` skips the prompt; `--dry-run` prints what would change.
 
 Two supporting changes:
 
