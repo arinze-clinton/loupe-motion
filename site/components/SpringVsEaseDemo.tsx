@@ -16,7 +16,7 @@ const config = {
 
 export function SpringVsEaseDemo() {
   return (
-    <DemoStage config={config} height={320}>
+    <DemoStage config={config} height={340}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 22, width: 320 }}>
         <Track label="spring" spring />
         <Track label="ease" />

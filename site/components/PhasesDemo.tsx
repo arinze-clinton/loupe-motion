@@ -18,7 +18,7 @@ const ITEMS = ['Draft the note', 'Pick the element', 'Scrub to the frame', 'Hand
 
 export function PhasesDemo() {
   return (
-    <DemoStage config={config} height={440}>
+    <DemoStage config={config} height={400}>
       <DemoCard style={{ width: 260, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {ITEMS.map((label, i) => (
           <Row key={i} index={i} label={label} />

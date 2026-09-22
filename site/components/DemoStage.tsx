@@ -26,7 +26,7 @@ export type DemoStageProps = {
   height?: number;
 };
 
-export function DemoStage({ config, children, height = 400 }: DemoStageProps) {
+export function DemoStage({ config, children, height = 360 }: DemoStageProps) {
   // Client-only: the panel is browser-only. Embedded mode skips the welcome
   // modal and all localStorage, so the demo opens straight on the panel.
   const [ready, setReady] = useState(false);
@@ -53,6 +53,8 @@ export function DemoStage({ config, children, height = 400 }: DemoStageProps) {
                 height: '100%',
                 display: 'grid',
                 placeItems: 'center',
+                paddingBottom: 144, // reserve the docked panel's zone so it never overlaps the scene
+                boxSizing: 'border-box',
                 background:
                   'radial-gradient(120% 120% at 50% 0%, rgba(58,151,249,0.10), transparent 60%)',
               }}
