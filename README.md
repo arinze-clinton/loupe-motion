@@ -85,8 +85,14 @@ It refuses rather than guesses. Conditional values, hand-written easing curves a
 computed phases are reported back untouched instead of being quietly resolved to a
 number that looks plausible and isn't.
 
+Under the hood the agent runs `loupe resolve`, which does the phase arithmetic and
+hands back each value's exact millisecond window and curve — tested against the real
+hooks, so the numbers aren't computed in an agent's head. What that tool can read as a
+literal is what's safe to convert; anything computed it flags rather than guesses.
+
 ```bash
-npx loupe skills   # installs or refreshes the bundled agent skills
+npx loupe skills    # installs or refreshes the bundled agent skills
+npx loupe resolve   # (optional) see the resolved facts yourself, --json for machines
 ```
 
 ## The idea
