@@ -1,0 +1,29 @@
+import { SpringVsEaseDemo } from '../components/SpringVsEaseDemo';
+import { PhasesDemo } from '../components/PhasesDemo';
+
+# Concepts
+
+Two ideas do most of the work in Loupe. Both demos below are live — the real
+panel, driving the real clock. Scrub them.
+
+## Phases
+
+A complex animation isn't a pile of separate tweens — it's one timeline, split
+into named phases. Here four checklist rows tick in across `item1` … `item4`.
+Scrub slowly and watch the stagger; the panel shows which phase you're in.
+
+<PhasesDemo />
+
+Because the whole thing is one clock, "what does frame 1,200ms look like?" has a
+single, exact answer — no matter how many elements move.
+
+## Spring vs ease
+
+Every value is a function of time, so a spring scrubs exactly like an eased
+value — it just *feels* different. Same 900ms phase, same 0 → 220px travel: the
+spring (blue) overshoots and settles, the eased dot (grey) glides straight in.
+
+<SpringVsEaseDemo />
+
+You don't reach for easing menus. You tell your agent "make it land softer" and
+it lowers the bounce; "snappier" and it shortens the phase. Text in, motion out.
