@@ -18,19 +18,39 @@ because the user won't catch it — they'll ship it.
 
 ## Steps
 
-1. **Find the scene.** Locate the `<TimelineProvider>` and read its `config`. If the
+1. **Find the scene id.** Locate the `<TimelineProvider>` and read `config.id`. If the
    project has more than one scene and the request is ambiguous, ask which.
-2. **Identify the library** — Framer values, the GSAP adapter, the WAAPI adapter,
-   Lottie, or raw `useTransform`. Step 3 only applies to Framer and raw
-   `useTransform`; GSAP and WAAPI keep their timing inside the build function.
-3. **Resolve the timing** for each animated value (see *Timing*).
+2. **Get the facts. Run `npx loupe resolve --scene <id> --json` and use its output —
+   do not compute timing yourself.** Loupe does the phase arithmetic and hands back,
+   per value: `resolvedStartMs` / `resolvedEndMs` (absolute ms), `from` / `to`, `ease`
+   (control points) and `easeName`, the driven `property`, the `component`, the
+   `line`, and `zeroLength`. Every value is either `convertible: true` with those
+   fields, or `convertible: false` with a `refuse` code and a `reason` — those are the
+   ones you must not guess (see the refusal table). This is the honesty boundary: if
+   `resolve` didn't resolve it, you don't invent it.
+3. **Identify the library** — Framer values, the GSAP adapter, the WAAPI adapter,
+   Lottie, or raw `useTransform`. This decides how you *write* each fact; `resolve`
+   already gave you the numbers. (GSAP and WAAPI keep their timing inside the build
+   function — `resolve` reports their `useTimelineValue` calls if any, but their
+   conversion is structural, below.)
 4. **Ask where it goes.** Which file, and whether it replaces an existing animation or
    lands fresh. Never choose a destination yourself.
 5. **Convert**, including stripping the scene wrapper.
 6. **Write it** where they said.
-7. **Report** — what converted, what you refused and why, and how to check.
+7. **Report** — what converted, what `resolve` refused and why, and how to check.
 
-## Timing
+If `resolve` can't run (older Loupe, or it reports `scene-config-not-found`), fall back
+to computing the timing yourself with the model in *Timing arithmetic — reference*
+below. Prefer `resolve`; it is tested against the real hooks and you are not.
+
+Convert milliseconds to seconds for Framer (`resolvedStartMs / 1000`), and pass
+`ease` through as the control-point array `resolve` gave you. When `zeroLength` is
+true, emit `duration: 0` so Framer doesn't invent its ~0.3s default fade.
+
+## Timing arithmetic — reference
+
+You normally get this from `resolve`. Kept here for the fallback case and so you can
+sanity-check a number.
 
 A `useTimelineValue` call resolves to a window:
 
@@ -62,13 +82,13 @@ useTimelineValue(0, 1, { phase: 'settle', offset: 100, duration: 200 })
 
 ### Guard these two windows
 
-- **`start === end`** — the value hard-steps. Emit `duration: 0`. Omitting it makes
-  Framer apply its ~0.3s default and invent a fade that was never there. Causes
-  include a phase in `phaseOrder` with no duration entry, an explicit `duration: 0`,
-  and `startMs === endMs`.
-- **`start > end`** — the value plays backwards. **Stop and report.** Never emit a
-  negative duration. Causes include an `offset` larger than the phase with no
-  `duration` set, a negative `duration`, and `endMs` below `startMs`.
+`resolve` flags both. If computing by hand:
+
+- **`start === end`** (`resolve`: `zeroLength: true`) — the value hard-steps. Emit
+  `duration: 0`. Omitting it makes Framer apply its ~0.3s default and invent a fade
+  that was never there.
+- **`start > end`** (`resolve`: `refuse: 'inverted-window'`) — the value plays
+  backwards. **Stop and report.** Never emit a negative duration.
 
 ## Curves
 
@@ -198,10 +218,22 @@ For **GSAP and WAAPI** it is not an artifact. Both adapters take a `loop` option
 GSAP's infinite repeat is **`repeat: -1`**. `repeat: Infinity` is Framer's spelling and
 is not valid GSAP.
 
-## Strip the scene wrapper
+## Strip the scene wrapper — only when every value converted
 
-"No timeline dependency" means the `@arinze-clinton/loupe` import is gone. The
-conversion rules above don't achieve that on their own.
+**If `resolve` refused even one value in the scene, do NOT strip the wrapper.** A
+refused value still calls `useTimelineValue` and still needs its clock, so
+`@arinze-clinton/loupe` and `<TimelineProvider>` have to stay. Watch for the cascade:
+if component A is fed a value from a refused hook in component B, A can't convert
+either. In that case this is a **partial conversion** — convert the values that
+resolved, leave everything else exactly as-is, keep the wrapper, and say clearly in
+your report that the scene can't lose its timeline dependency until the refused values
+are reworked (and how — give a literal `phase` instead of an index, split a conditional
+so `from`/`to` are literals, etc.). A half-stripped scene that breaks the un-converted
+rows is worse than an honest partial.
+
+When **every** value converted, "no timeline dependency" means the
+`@arinze-clinton/loupe` import is gone. The conversion rules above don't achieve that on
+their own:
 
 - `<TimelineProvider>` — pure scaffolding. Remove it and its config object.
 - `<SceneRoot>` — **not** an inert wrapper. It emits `data-loupe-scene-root`, takes an
@@ -225,18 +257,25 @@ see the table.
 
 ## Refuse to guess
 
-| Case | What to do |
-|---|---|
-| Conditional `from`/`to` — e.g. `reduce ? 1 : 0` | Keep the conditional in the output. Don't collapse it to one branch. |
-| Non-literal `phase` — a variable, prop, or computed key | Resolve **per rendered instance**, not per call site. One call site rendered N times with an index-derived phase has N different delays. Never apply one instance's timing to all of them. |
-| Hand-written easing function (not `cubicBezier`) | Stop. Report it. Offer to keep the import, or to sample it into keyframe stops — the user's choice. |
-| `from`/`to` from props, state, or computed expressions | Stop. Don't inline a value you observed at one moment. |
-| Inverted window (`start > end`) | Stop. Never emit a negative duration. |
-| `useTransform` not reading the timeline's `time`, or non-numeric output | Out of scope. Refuse. |
-| `usePhaseEnterKey` / `usePhaseFromTime` | Stop. They exist to re-fire one-shot effects each loop pass; a `useEffect(…, [])` reversal loses the re-trigger, and the phase encodes a delay that has to be computed. |
-| Lottie via `useLoupeLottie` | The hook **is** the player — it hardcodes `autoplay: false, loop: true` inside `loadAnimation`. Rewrite the call; there's no wrapper to delete. |
-| Scene config that isn't a literal object | Stop — the timing can't be resolved statically. |
-| Destination unclear | Ask. Never pick a path. |
+Most of these `resolve` flags for you as a `refuse` code (shown in the middle column);
+a few are structural and `resolve` can't see them, so you must catch those yourself.
+
+| Case | `resolve` code | What to do |
+|---|---|---|
+| Conditional `from`/`to` — e.g. `reduce ? 1 : 0` | `conditional-from-to` | Keep the conditional in the output. Don't collapse it to one branch. |
+| Non-literal `phase` — a variable, prop, or computed key | `non-literal-phase` | Resolve **per rendered instance**, not per call site. One call site rendered N times with an index-derived phase has N different delays. Never apply one instance's timing to all of them. |
+| Hand-written easing function (not `cubicBezier`) | `unknown-easing` | Stop. Report it. Offer to keep the import, or to sample it into keyframe stops — the user's choice. |
+| `from`/`to`/option from props, state, or computed expressions | `computed-value` / `computed-option` | Stop. Don't inline a value you observed at one moment. |
+| Inverted window (`start > end`) | `inverted-window` | Stop. Never emit a negative duration. |
+| Phase name not in `phaseOrder` | `unknown-phase` | Stop — the timing can't be resolved. |
+| Scene config not in the same file / not a literal | `scene-config-not-found` | Run `resolve` where the `<TimelineProvider>` lives, or read the config and compute by hand. |
+| `useTransform` not reading the timeline's `time`, or non-numeric output | *(not flagged)* | Out of scope. Refuse. |
+| `usePhaseEnterKey` / `usePhaseFromTime` | *(not flagged)* | Stop. They exist to re-fire one-shot effects each loop pass; a `useEffect(…, [])` reversal loses the re-trigger, and the phase encodes a delay that has to be computed. |
+| Lottie via `useLoupeLottie` | *(not flagged)* | The hook **is** the player — it hardcodes `autoplay: false, loop: true` inside `loadAnimation`. Rewrite the call; there's no wrapper to delete. |
+| Destination unclear | *(not flagged)* | Ask. Never pick a path. |
+
+The four `*(not flagged)*` rows are the ones `resolve` can't detect statically — you
+own those. Everything else, trust the `refuse` code.
 
 Convert what's convertible, leave the rest untouched, and say plainly what you left.
 
