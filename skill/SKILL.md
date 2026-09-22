@@ -142,6 +142,10 @@ If that skill isn't installed, `npx loupe skills` installs it.
 
 Default to timeline-bound. Pick phase names that read like a story (`idle`, `enter`, `hold`, `exit`). Use `useTimelineValue(from, to, { phase, offset, duration, ease })` for every animated property. Wrap the scene in `<TimelineProvider>` with `id`, `label`, `phaseOrder`, `phaseDurations`. Loupe picks it up automatically once it's registered.
 
+**Ease or spring?** Both are functions of time and both scrub identically. Use `useTimelineValue` (a `cubic-bezier` curve) for measured, controlled motion — fades, wipes, precise choreography. Use `useTimelineSpring(from, to, { phase, duration, bounce })` for anything physical — a card landing, a sheet snapping in, a control settling — where you want overshoot and life. `bounce` is the feel: `0` lands clean, `~0.2` is a gentle default, `~0.45` visibly wobbles. A spring settles within its `duration`, so it occupies the same phase window as an eased value.
+
+**Reading feedback.** When the user's note is about *physicality* — "it lands too hard", "make it bouncier", "it should settle", "too stiff", "springier" — that's a spring: reach for `useTimelineSpring` and adjust `bounce` (harder/stiffer → lower bounce; bouncier → higher). When it's about *timing or pacing* — "too slow", "start later", "ease out more" — that's `useTimelineValue` and its `duration`/`offset`/`ease`. Don't add spring buttons to the panel; the user talks, you make the edit.
+
 ### D. User wants to mount Loupe somewhere new
 
 If they have `LoupeRegistryProvider` and `AnnotationsProvider` at the root, just render `<LoupePanel />`, `<AnnotationOverlay />`, and `<AnnotationPins />` inside the gate they want (e.g. `import.meta.env.DEV`, query param, hotkey).

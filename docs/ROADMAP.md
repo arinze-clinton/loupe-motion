@@ -58,11 +58,17 @@ existing users on old skills). `init` points at it. Framework-agnostic; verified
 end-to-end in a browser. Deeper: this is where prepare-for-production stops being
 a nicety and becomes the only way out.
 
-### Step 3 — Springs on the timeline
+### Step 3 — Springs on the timeline ✅ *shipped*
 `useTimelineSpring(from, to, { phase, duration, bounce })`. A spring is a
-function of time, so it scrubs like everything else. Loupe computes where it
-settles and auto-extends the loop so a bounce is never cut off — the user never
-adds a rest phase. Prerequisite for mobile, not an add-on.
+function of time, so it scrubs like everything else. Uses Apple's iOS-17
+`{duration, bounce}` vocabulary via framer's own spring, sampled into a
+scrub-safe table. Finding: a `{duration,bounce}` spring settles *within* its
+duration (verified to bounce 0.7), so it occupies the same `[start,end]` window
+as an eased value — the feared loop-overflow / auto-rest-phase problem doesn't
+arise, so no loop surgery was needed. resolve reports `kind:'spring'` + bounce;
+both skills teach spring-vs-curve (from feedback) and spring conversion
+(`type:'spring'` in Framer, `withSpring` note for RN). Verified in-browser:
+overshoot to 1.025 past a 1.0 target, clock-driven. Prerequisite for mobile.
 
 ### Step 4 — React Native / Expo
 `useTimelineValue` returns a Reanimated value on native, a MotionValue on web

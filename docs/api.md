@@ -101,6 +101,26 @@ const y = useTimelineValue(20, 0, { phase: 'enter', offset: 200, duration: 500 }
 const x = useTimelineValue(-100, 0, { startMs: 1200, endMs: 1900 });
 ```
 
+### `useTimelineSpring(from, to, options?): MotionValue<number>`
+
+Like `useTimelineValue`, but springs `from → to` instead of easing. A spring is a pure
+function of time, so it scrubs, pauses, and rewinds exactly like an eased value.
+
+Options are the same windowing fields (`phase`, `offset`, `duration`, `startMs`,
+`endMs`) plus `bounce` instead of `ease`. `bounce` is Apple's iOS-17 spring vocabulary:
+`0` lands clean, `~0.2` is a gentle default, `~0.45` visibly wobbles. The spring settles
+within the window's duration, so it occupies the same `[start, end]` span as an eased
+value — no phase or loop gymnastics.
+
+```tsx
+// A card that springs up and scales in with a visible bounce
+const y = useTimelineSpring(60, 0, { phase: 'enter', bounce: 0.45 });
+const scale = useTimelineSpring(0.8, 1, { phase: 'enter', bounce: 0.45 });
+```
+
+Reach for a spring when the motion should feel physical — landing, settling, snapping.
+Reach for `useTimelineValue` when you want measured, controlled easing.
+
 ### `usePhaseFromTime(): string`
 
 Returns the current phase name. Re-renders when the phase changes (not on every tick).

@@ -22,12 +22,13 @@ because the user won't catch it — they'll ship it.
    project has more than one scene and the request is ambiguous, ask which.
 2. **Get the facts. Run `npx loupe resolve --scene <id> --json` and use its output —
    do not compute timing yourself.** Loupe does the phase arithmetic and hands back,
-   per value: `resolvedStartMs` / `resolvedEndMs` (absolute ms), `from` / `to`, `ease`
-   (control points) and `easeName`, the driven `property`, the `component`, the
-   `line`, and `zeroLength`. Every value is either `convertible: true` with those
-   fields, or `convertible: false` with a `refuse` code and a `reason` — those are the
-   ones you must not guess (see the refusal table). This is the honesty boundary: if
-   `resolve` didn't resolve it, you don't invent it.
+   per value: `kind` (`"value"` eased, or `"spring"`), `resolvedStartMs` /
+   `resolvedEndMs` (absolute ms), `from` / `to`, the driven `property`, the
+   `component`, the `line`, and `zeroLength`. Eased values carry `ease` (control
+   points) and `easeName`; springs carry `bounce`. Every value is either
+   `convertible: true` with those fields, or `convertible: false` with a `refuse` code
+   and a `reason` — those are the ones you must not guess (see the refusal table). This
+   is the honesty boundary: if `resolve` didn't resolve it, you don't invent it.
 3. **Identify the library** — Framer values, the GSAP adapter, the WAAPI adapter,
    Lottie, or raw `useTransform`. This decides how you *write* each fact; `resolve`
    already gave you the numbers. (GSAP and WAAPI keep their timing inside the build
@@ -134,6 +135,31 @@ transition={{
   y:       { delay: 0.6, duration: 0.3, ease: [0.175, 0.885, 0.32, 1.275] },
 }}
 ```
+
+## Converting — springs (`kind: "spring"`)
+
+A resolved spring carries `from`/`to`, its `resolvedStartMs`/`resolvedEndMs` window, and
+`bounce`. In Framer it converts to a spring transition — same `initial`/`animate`, but
+the transition is `type: 'spring'` with the window's duration and the bounce:
+
+\`\`\`tsx
+// resolve: { kind:'spring', from:60, to:0, resolvedStartMs:0, resolvedEndMs:600, bounce:0.45, property:'y' }
+<motion.div
+  initial={{ y: 60 }}
+  animate={{ y: 0 }}
+  transition={{ type: 'spring', duration: 0.6, bounce: 0.45, delay: 0 }}
+/>
+\`\`\`
+
+`duration` is `(resolvedEndMs − resolvedStartMs) / 1000`, `delay` is
+`resolvedStartMs / 1000`. These are Framer's own `{ type:'spring', duration, bounce }`
+params, the same ones Loupe sampled the timeline value from — so the production spring
+matches what you tuned, exactly. Do **not** convert a spring to an eased `cubic-bezier`;
+you'd lose the overshoot. Multiple spring values on one element get per-property spring
+transitions, same as the eased case.
+
+(React Native / Reanimated target: a spring becomes `withSpring(to, { duration, dampingRatio })`
+where `dampingRatio ≈ 1 − bounce`. Full Reanimated table lands with the native adapter.)
 
 ## Converting — raw `useTransform`
 

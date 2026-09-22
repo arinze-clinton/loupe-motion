@@ -201,3 +201,40 @@ describe('resolveSource — scene discovery', () => {
     expect(res.warnings.join(' ')).toMatch(/2 scenes/);
   });
 });
+
+describe('resolveSource — springs', () => {
+  const springScene = (body: string) => `
+    import { TimelineProvider, useTimelineSpring } from '@arinze-clinton/loupe';
+    import { motion } from 'framer-motion';
+    const config = { id: 's', label: 'S', phaseOrder: ['enter'] as const, phaseDurations: { enter: 600 } };
+    function Scene() { return <TimelineProvider config={config}><Inner /></TimelineProvider>; }
+    function Inner() { ${body} return <motion.div style={{ y }} />; }
+  `;
+  const one = (src: string) => resolveSource(src, 'spring.tsx').scenes[0]!.values[0]!;
+
+  it('resolves a spring with kind, window, and bounce', () => {
+    const v = one(springScene(`const y = useTimelineSpring(40, 0, { phase: 'enter', bounce: 0.4 });`));
+    expect(v.convertible).toBe(true);
+    expect(v.kind).toBe('spring');
+    expect(v.bounce).toBe(0.4);
+    expect(v.resolvedStartMs).toBe(0);
+    expect(v.resolvedEndMs).toBe(600);
+    expect(v.ease).toBeUndefined();
+  });
+
+  it('defaults bounce to 0.2', () => {
+    const v = one(springScene(`const y = useTimelineSpring(40, 0, { phase: 'enter' });`));
+    expect(v.bounce).toBe(0.2);
+  });
+
+  it('refuses a computed bounce rather than guessing', () => {
+    const v = one(springScene(`const y = useTimelineSpring(40, 0, { phase: 'enter', bounce: base * 2 });`));
+    expect(v.convertible).toBe(false);
+    expect(v.refuse).toBe('computed-option');
+  });
+
+  it('still refuses a conditional from on a spring', () => {
+    const v = one(springScene(`const y = useTimelineSpring(reduce ? 40 : 0, 0, { phase: 'enter' });`));
+    expect(v.refuse).toBe('conditional-from-to');
+  });
+});

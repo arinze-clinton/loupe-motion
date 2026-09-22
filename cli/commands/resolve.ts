@@ -89,11 +89,12 @@ function printHuman(scenes: ResolvedScene[], warnings: string[], wanted?: string
       const where = v.property ?? v.variable ?? '(value)';
       const win = `${fmtMs(v.resolvedStartMs!)} → ${fmtMs(v.resolvedEndMs!)}`;
       const zero = v.zeroLength ? kleur.yellow(' [instant]') : '';
+      const shape = v.kind === 'spring' ? `spring ${v.bounce}` : (v.easeName ?? 'curve');
       console.log(
         '    ' +
           kleur.green('✓ ') +
           kleur.cyan((v.component ? v.component + '.' : '') + where) +
-          kleur.dim(`  ${v.from}→${v.to}  ${win}  ${v.easeName ?? 'curve'}`) +
+          kleur.dim(`  ${v.from}→${v.to}  ${win}  ${shape}`) +
           zero,
       );
     }

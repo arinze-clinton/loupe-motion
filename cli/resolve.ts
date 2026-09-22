@@ -51,6 +51,9 @@ export type ResolvedValue = {
   /** The style property this value drives, when it could be traced. */
   property?: string;
 
+  /** Which hook produced this — an eased value or a spring. */
+  kind: 'value' | 'spring';
+
   from?: number;
   to?: number;
   phase?: string;
@@ -59,9 +62,11 @@ export type ResolvedValue = {
   startMs?: number;
   endMs?: number;
 
-  /** Resolved easing control points, when known. */
+  /** Eased values only: resolved easing control points, when known. */
   ease?: [number, number, number, number];
   easeName?: string;
+  /** Springs only: overshoot (0 clean, higher wobbles). Defaults to 0.2. */
+  bounce?: number;
 
   /** Absolute window on the scene clock, in ms. Present when convertible. */
   resolvedStartMs?: number;
@@ -293,12 +298,14 @@ function extractValue(
   file: string,
   ranges: { phase: string; start: number; end: number; duration: number }[] | null,
   totalDuration: number | null,
+  hookKind: 'value' | 'spring',
 ): ResolvedValue {
   const node = callPath.node;
   const line = node.loc?.start.line ?? 0;
   const base: Omit<ResolvedValue, 'convertible'> = {
     file,
     line,
+    kind: hookKind,
     component: enclosingComponent(callPath),
     variable: t.isVariableDeclarator(callPath.parent) && t.isIdentifier(callPath.parent.id)
       ? callPath.parent.id.name
@@ -338,10 +345,14 @@ function extractValue(
         const s = stringLiteral(v);
         if (s === undefined) return refusal(base, 'non-literal-phase', '`phase` isn\'t a string literal — resolve each rendered instance separately');
         phase = s;
-      } else if (key === 'ease') {
+      } else if (key === 'ease' && hookKind === 'value') {
         const e = readEase(v);
         if (e === 'unknown') return refusal(base, 'unknown-easing', '`ease` isn\'t a known curve — keep the import or sample it into stops');
         if (e !== 'default') { base.ease = e.ease; base.easeName = e.name; }
+      } else if (key === 'bounce' && hookKind === 'spring') {
+        const n = numberLiteral(v);
+        if (n === undefined) return refusal(base, 'computed-option', '`bounce` isn\'t a literal number — resolve it by hand');
+        base.bounce = n;
       } else if (key === 'offset' || key === 'duration' || key === 'startMs' || key === 'endMs') {
         const n = numberLiteral(v);
         if (n === undefined) return refusal(base, 'computed-option', `\`${key}\` isn't a literal number — resolve it by hand`);
@@ -358,8 +369,13 @@ function extractValue(
   base.startMs = startMs;
   base.endMs = endMs;
 
-  // Default curve, stated explicitly so the agent always emits one.
-  if (!base.ease) { base.ease = NAMED_CURVES[DEFAULT_CURVE_NAME]; base.easeName = DEFAULT_CURVE_NAME; }
+  // State the default explicitly so the agent always emits one.
+  if (hookKind === 'spring') {
+    if (base.bounce === undefined) base.bounce = 0.2;
+  } else if (!base.ease) {
+    base.ease = NAMED_CURVES[DEFAULT_CURVE_NAME];
+    base.easeName = DEFAULT_CURVE_NAME;
+  }
 
   // Timing — needs the scene's phase ranges.
   if (!ranges || totalDuration === null) {
@@ -458,8 +474,10 @@ export function resolveSource(src: string, file: string): ResolveResult {
   const values: ResolvedValue[] = [];
   traverse(ast, {
     CallExpression(p) {
-      if (!t.isIdentifier(p.node.callee) || p.node.callee.name !== 'useTimelineValue') return;
-      values.push(extractValue(p, file, ranges, totalDuration));
+      if (!t.isIdentifier(p.node.callee)) return;
+      const name = p.node.callee.name;
+      if (name === 'useTimelineValue') values.push(extractValue(p, file, ranges, totalDuration, 'value'));
+      else if (name === 'useTimelineSpring') values.push(extractValue(p, file, ranges, totalDuration, 'spring'));
     },
   });
 
