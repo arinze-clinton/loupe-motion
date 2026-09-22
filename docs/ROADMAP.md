@@ -28,10 +28,11 @@ Each ships on its own. Nothing waits on the whole.
 
 ### Step 1 — Foundations (in progress)
 Make the ground dependable before building on it.
-- **`loupe resolve --json`** — Loupe does the animation math and emits the
-  facts; the agent copies answers instead of computing them. The static-
-  analysis boundary IS the refusal boundary: if it can be read as a literal
-  it's convertible; if it's computed/conditional it's flagged, not guessed.
+- **`loupe resolve --json`** ✅ *shipped* — Loupe does the animation math and
+  emits the facts; the agent copies answers instead of computing them. The
+  static-analysis boundary IS the refusal boundary: literal → convertible with
+  resolved absolute-ms timing; computed/conditional → a machine-readable
+  refusal code, never a guess. 19 fixture tests pin the arithmetic + refusals.
 - **Fixtures + `loupe release-check`** — skill outputs tested against known
   scenes before publishing, so a skill edit is a tested change.
 - **Fix the publish pipeline** — token (user) + single publisher (no laptop/CI

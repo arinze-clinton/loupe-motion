@@ -4,6 +4,7 @@ import { scan } from './commands/scan.js';
 import { refactor } from './commands/refactor.js';
 import { check } from './commands/check.js';
 import { skills } from './commands/skills.js';
+import { resolve } from './commands/resolve.js';
 import { uninstall } from './commands/uninstall.js';
 import { LOUPE_VERSION } from './util.js';
 
@@ -20,6 +21,13 @@ async function main() {
     case 'scan': {
       const json = rest.includes('--json');
       await scan({ cwd: process.cwd(), json });
+      break;
+    }
+    case 'resolve': {
+      const json = rest.includes('--json');
+      const sIdx = rest.indexOf('--scene');
+      const scene = sIdx !== -1 ? rest[sIdx + 1] : undefined;
+      await resolve({ cwd: process.cwd(), json, scene });
       break;
     }
     case 'refactor':
@@ -70,6 +78,7 @@ ${kleur.bold('Usage')}
   loupe ${kleur.cyan('init')}            Wire Loupe into your project + install the Claude skill
   loupe ${kleur.cyan('init --upgrade-demo')}  Rewrite a generated loupe-demo-scene.tsx to the latest template (with backup)
   loupe ${kleur.cyan('scan')} [--json]   Report which animations are timeline-bound
+  loupe ${kleur.cyan('resolve')} [--scene id] [--json]  Emit resolved timing/curve facts for conversion
   loupe ${kleur.cyan('refactor')}        Interactive walk-through to make animations scrubbable (no AI needed)
   loupe ${kleur.cyan('skills')}          Install or refresh the bundled Claude skills (--force, --dry-run)
   loupe ${kleur.cyan('check')}           Show installed version + check for updates
