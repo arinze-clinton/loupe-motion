@@ -33,12 +33,20 @@ Make the ground dependable before building on it.
   static-analysis boundary IS the refusal boundary: literal → convertible with
   resolved absolute-ms timing; computed/conditional → a machine-readable
   refusal code, never a guess. 19 fixture tests pin the arithmetic + refusals.
-- **Fixtures + `loupe release-check`** — skill outputs tested against known
-  scenes before publishing, so a skill edit is a tested change.
-- **Fix the publish pipeline** — token (user) + single publisher (no laptop/CI
-  race).
-- **Split `LoupePanel.tsx`** (~2,300 lines; both recent bugs lived here) and
-  stop the after-unmount frame loop.
+- **Fixtures** ✅ *shipped* — resolve output pinned against the real landing
+  scenes (25 tests total). Chose fixture tests over a separate `release-check`
+  command; `npm test` in CI already runs them.
+- **prepare-for-production reads from resolve** ✅ *shipped* — validated by a
+  fresh agent that took resolve's numbers verbatim and refused what resolve
+  refused, including a correct *partial conversion* when a scene has refused
+  values.
+- **Fix the publish pipeline** — token (user, still outstanding) + single
+  publisher (no laptop/CI race).
+- **Panel:** theme tokens extracted to `panel/theme.ts` ✅. The deeper
+  structural split (icons, overlays, controls) is **folded into Step 3** —
+  springs touch the panel anyway, so we split once, there, instead of twice.
+  Note the "after-unmount frame loop" turned out to be correct cleanup that
+  just doesn't terminate in a layout-less test env, not a production leak.
 
 ### Step 2 — Workbench mode
 A blank page to build an animation in when the real page won't cooperate.

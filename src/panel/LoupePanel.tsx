@@ -40,18 +40,10 @@ const LOUPE_POSITION_KEY = 'loupe:panelPosition';
  *  first. */
 const LOUPE_ACTIVE_SCENE_KEY = 'loupe:activeScene';
 
-const FONT = 'var(--loupe-font, system-ui, -apple-system, sans-serif)';
-const ACCENT = 'var(--loupe-accent, #3A97F9)';
-const ACCENT_SOFT = 'var(--loupe-accent-soft, rgba(58, 151, 249, 0.28))';
-const ACCENT_GLOW = 'var(--loupe-accent-glow, rgba(58, 151, 249, 0.6))';
-const ACCENT_RING = 'var(--loupe-accent-ring, rgba(58, 151, 249, 0.18))';
-const ACCENT_HALO = 'var(--loupe-accent-halo, rgba(58, 151, 249, 0.35))';
-const ACCENT_TINT = 'var(--loupe-accent-tint, rgba(58, 151, 249, 0.7))';
-const PANEL_BG = 'var(--loupe-panel-bg, rgba(18, 20, 25, 0.92))';
-const PANEL_FG = 'var(--loupe-panel-fg, #E8EAEE)';
-const PANEL_MUTED = 'var(--loupe-panel-muted, #9BA3AF)';
-const PANEL_BORDER = 'var(--loupe-panel-border, rgba(255, 255, 255, 0.08))';
-const PANEL_HIGHLIGHT = 'var(--loupe-panel-highlight, #EAF3FF)';
+import {
+  FONT, ACCENT, ACCENT_SOFT, ACCENT_GLOW, ACCENT_RING, ACCENT_HALO, ACCENT_TINT,
+  PANEL_BG, PANEL_FG, PANEL_MUTED, PANEL_BORDER, PANEL_HIGHLIGHT,
+} from './theme';
 
 export function LoupePanel() {
   const registry = useLoupeRegistry();
