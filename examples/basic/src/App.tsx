@@ -7,6 +7,7 @@ import {
   useLoupeRegistry,
 } from '@arinze-clinton/loupe';
 import { GsapDemo } from './GsapDemo';
+import { SpringDemo } from './SpringDemo';
 
 // Opt-in demo scenes for exercising the adapters. The default
 // playground stays empty (first-install onboarding state); add
@@ -29,7 +30,7 @@ export function App() {
   return (
     <LoupeRegistryProvider>
       <AnnotationsProvider>
-        {demo === 'gsap' ? <GsapDemo /> : <Placeholder />}
+        {demo === 'gsap' ? <GsapDemo /> : demo === 'spring' ? <SpringDemo /> : <Placeholder />}
         <LoupePanel />
         <AnnotationOverlay />
         <AnnotationPins />

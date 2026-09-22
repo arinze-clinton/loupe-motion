@@ -3,6 +3,7 @@ export { TimelineProvider, useTimeline, type TimelineState } from './runtime/Tim
 export {
   useTimelineTime,
   useRangeOf,
+  useTimelineSpring,
   useTimelineValue,
   usePhaseFromTime,
   usePhaseEnterKey,
