@@ -1,0 +1,66 @@
+/* Light, robust polish on top of nextra-theme-docs — no fighting internals. */
+
+:root {
+  --loupe-accent: #3a97f9;
+}
+
+/* Tighter, more confident headings. */
+.nextra-content h1 {
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+.nextra-content h2 {
+  letter-spacing: -0.02em;
+}
+
+/* Selection in the brand accent. */
+::selection {
+  background: rgba(58, 151, 249, 0.28);
+}
+
+/* Inline code reads as a token, not a wall. */
+.nextra-content :not(pre) > code {
+  font-size: 0.92em;
+}
+
+/* The hero band. */
+.loupe-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0 22px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--nextra-border, rgba(120, 120, 130, 0.2));
+  font-size: 13px;
+  color: var(--loupe-muted, #8b8b93);
+}
+.loupe-hero-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--nextra-border, rgba(120, 120, 130, 0.25));
+  background: rgba(120, 120, 130, 0.06);
+  color: inherit;
+}
+.loupe-hero-cmd button {
+  border: none;
+  background: transparent;
+  color: var(--loupe-accent);
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+}
+.loupe-hero-links a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+.loupe-hero-links a:hover {
+  border-bottom-color: currentColor;
+}
