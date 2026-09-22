@@ -70,6 +70,20 @@ Run **`npx loupe refactor`** — Loupe walks you through each fire-and-forget an
 
 Using Claude, Cursor, or Copilot? `npx loupe init` installed a skill that lets you ask in plain English: *"audit my animations"*, *"make this scrubbable"*. The agent does the same walkthrough.
 
+## Rather build it in isolation?
+
+When the real page an animation will live on is awkward to work in, scaffold a workbench:
+
+```bash
+npx loupe workbench
+cd loupe-workbench && npm install && npm run dev
+```
+
+A standalone page with one starter scene and the Loupe panel — build and scrub in
+peace, pull in your own components with `@/…` when you want them, then hand off to
+production the same way. Works the same whether your project is Next, Vite, Remix, or
+anything else, because the workbench is its own tiny app.
+
 ## Done tweaking? Hand it off
 
 When an animation is finished, the timeline binding that made it scrubbable is

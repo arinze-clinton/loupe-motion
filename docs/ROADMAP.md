@@ -40,18 +40,23 @@ Make the ground dependable before building on it.
   fresh agent that took resolve's numbers verbatim and refused what resolve
   refused, including a correct *partial conversion* when a scene has refused
   values.
-- **Fix the publish pipeline** — token (user, still outstanding) + single
-  publisher (no laptop/CI race).
+- **Fix the publish pipeline** ✅ CI now skips-with-warning on a missing/expired
+  token (no more failure emails) and defers to a local publish (no race). Token
+  refresh itself is still the user's to do to re-enable automated publishing.
 - **Panel:** theme tokens extracted to `panel/theme.ts` ✅. The deeper
   structural split (icons, overlays, controls) is **folded into Step 3** —
   springs touch the panel anyway, so we split once, there, instead of twice.
   Note the "after-unmount frame loop" turned out to be correct cleanup that
   just doesn't terminate in a layout-less test env, not a production leak.
 
-### Step 2 — Workbench mode
-A blank page to build an animation in when the real page won't cooperate.
-`loupe init` offers in-place vs workbench; a marker file records which. This is
-where prepare-for-production stops being a nicety and becomes the only way out.
+### Step 2 — Workbench mode ✅ *shipped*
+`loupe workbench` scaffolds a standalone Vite page (starter scene + panel), with
+a `.loupe/workbench.json` marker so scan/check/skills know it's a workbench.
+`loupe check` now reports workbench presence and whether installed skills have
+drifted behind the package (closing the gap where `init`'s early-return left
+existing users on old skills). `init` points at it. Framework-agnostic; verified
+end-to-end in a browser. Deeper: this is where prepare-for-production stops being
+a nicety and becomes the only way out.
 
 ### Step 3 — Springs on the timeline
 `useTimelineSpring(from, to, { phase, duration, bounce })`. A spring is a

@@ -1,3 +1,6 @@
+import path from 'node:path';
+import { promises as fs } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import kleur from 'kleur';
 import {
   checkInstall,
@@ -10,6 +13,52 @@ import {
   warnOnInvokerMismatch,
   LOUPE_VERSION,
 } from '../util.js';
+import { planSkillSync } from '../skills.js';
+import { WORKBENCH_MARKER } from '../workbench.js';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+
+/**
+ * Report installed skills vs what the package ships, and any workbench.
+ *
+ * This is the drift check: `init` returns early for an existing install and
+ * its writer defaults to "don't overwrite", so a user who installed months ago
+ * never hears that a skill was added or corrected. `check` closes that loop by
+ * comparing and nudging `loupe skills`.
+ */
+async function reportSetup(cwd: string): Promise<void> {
+  const skillRoot = path.resolve(here, '..', '..', 'skill');
+  try {
+    const plan = await planSkillSync(cwd, skillRoot);
+    const missing = plan.filter((e) => e.status === 'create');
+    const behind = plan.filter((e) => e.status === 'differs');
+    const current = plan.filter((e) => e.status === 'identical');
+    console.log();
+    console.log(kleur.bold('  Skills'));
+    if (missing.length === 0 && behind.length === 0) {
+      console.log(
+        current.length > 0
+          ? kleur.green('    ✓ installed and current')
+          : kleur.dim('    none installed'),
+      );
+    } else {
+      if (missing.length) console.log(kleur.yellow(`    ${missing.length} not installed`));
+      if (behind.length) console.log(kleur.yellow(`    ${behind.length} behind the version Loupe ships`));
+      console.log(kleur.dim('    Run ') + kleur.cyan('npx loupe skills') + kleur.dim(' to install/refresh (a .loupe-backup is kept).'));
+    }
+  } catch {
+    /* skill source not found (unusual install) — skip quietly */
+  }
+
+  try {
+    const marker = JSON.parse(await fs.readFile(path.join(cwd, WORKBENCH_MARKER), 'utf8'));
+    console.log();
+    console.log(kleur.bold('  Workbench'));
+    console.log(kleur.dim('    scaffolded in ') + kleur.cyan(`${marker.dir}/`));
+  } catch {
+    /* no workbench — nothing to report */
+  }
+}
 
 /**
  * `loupe check` — quick status report for users who already have
@@ -60,6 +109,8 @@ export async function check({ cwd, offline }: CheckOptions): Promise<void> {
         : ''),
   );
   console.log(`  CLI:       ${kleur.bold(LOUPE_VERSION)}`);
+
+  await reportSetup(cwd);
 
   if (offline) {
     console.log();

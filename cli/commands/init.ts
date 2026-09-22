@@ -414,6 +414,11 @@ function printGoodToKnow(invocation: (cmd: string) => string): void {
   );
   console.log(
     kleur.dim('  • ') +
+      kleur.cyan(invocation('workbench')) +
+      kleur.dim(' build an animation on a blank page, in isolation'),
+  );
+  console.log(
+    kleur.dim('  • ') +
       kleur.cyan(invocation('uninstall')) +
       kleur.dim(' remove Loupe cleanly from this project'),
   );
