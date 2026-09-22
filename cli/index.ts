@@ -5,6 +5,7 @@ import { refactor } from './commands/refactor.js';
 import { check } from './commands/check.js';
 import { skills } from './commands/skills.js';
 import { resolve } from './commands/resolve.js';
+import { workbench } from './commands/workbench.js';
 import { uninstall } from './commands/uninstall.js';
 import { LOUPE_VERSION } from './util.js';
 
@@ -28,6 +29,12 @@ async function main() {
       const sIdx = rest.indexOf('--scene');
       const scene = sIdx !== -1 ? rest[sIdx + 1] : undefined;
       await resolve({ cwd: process.cwd(), json, scene });
+      break;
+    }
+    case 'workbench': {
+      const nIdx = rest.indexOf('--name');
+      const name = nIdx !== -1 ? rest[nIdx + 1] : undefined;
+      await workbench({ cwd: process.cwd(), name });
       break;
     }
     case 'refactor':
@@ -79,6 +86,7 @@ ${kleur.bold('Usage')}
   loupe ${kleur.cyan('init --upgrade-demo')}  Rewrite a generated loupe-demo-scene.tsx to the latest template (with backup)
   loupe ${kleur.cyan('scan')} [--json]   Report which animations are timeline-bound
   loupe ${kleur.cyan('resolve')} [--scene id] [--json]  Emit resolved timing/curve facts for conversion
+  loupe ${kleur.cyan('workbench')} [--name dir]  Scaffold a standalone page to build an animation in
   loupe ${kleur.cyan('refactor')}        Interactive walk-through to make animations scrubbable (no AI needed)
   loupe ${kleur.cyan('skills')}          Install or refresh the bundled Claude skills (--force, --dry-run)
   loupe ${kleur.cyan('check')}           Show installed version + check for updates
