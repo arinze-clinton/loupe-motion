@@ -70,13 +70,25 @@ both skills teach spring-vs-curve (from feedback) and spring conversion
 (`type:'spring'` in Framer, `withSpring` note for RN). Verified in-browser:
 overshoot to 1.025 past a 1.0 target, clock-driven. Prerequisite for mobile.
 
-### Step 4 — React Native / Expo
-`useTimelineValue` returns a Reanimated value on native, a MotionValue on web
-(a `/native` adapter — the biggest engineering item, requires prying the
-timeline core off Framer). Expo runs in the browser, so the workbench runs the
-*real* component that ships to iOS/Android.
+### Step 4 — React Native / Expo (split)
+- **Handoff** ✅ *shipped* — prepare-for-production emits Reanimated:
+  eased → `withTiming(to, { duration, easing: Easing.bezier(...) })`, spring →
+  `withSpring(to, { duration, dampingRatio: 1 − bounce })`, delays via
+  `withDelay`, web style → RN `transform` array. Durations in ms (not seconds).
+  The emitted code was type-checked against real Reanimated 3.19 types. Timing,
+  curve, and bounce transfer exactly; the component is rebuilt from resolve's
+  facts, not the same instance.
+- **Native runtime adapter** — spec'd, deferred:
+  `docs/superpowers/specs/2026-09-22-native-runtime-adapter-design.md`.
+  `useTimelineValue`/`useTimelineSpring` returning live Reanimated values so the
+  workbench runs the *real* shipping component. Needs a real Expo + Reanimated
+  app on a device to build and verify safely — not shipped unverified. The pure
+  pieces (resolveWindow, sampleSpring) port with little change; the sampled-
+  spring-table approach is the promising path for native springs.
 
 ## Parked (revisit later, deliberately not now)
+- **Native Reanimated runtime adapter** — spec'd above; the next real build,
+  gated on a device to verify against.
 - **Native SwiftUI / Compose** as a handoff *spec* (exact phases/ms/curves +
   reference render), not a conversion — the browser draws with a different
   engine than the phone, so a preview can't be the product, and visuals would

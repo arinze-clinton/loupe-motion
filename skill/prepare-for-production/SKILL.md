@@ -229,6 +229,58 @@ useEffect(() => {
 The adapter cancels for a reason. Without it, StrictMode's double-invoke leaves two
 composited animations on the element, and every remount adds another.
 
+## Converting — React Native (Reanimated)
+
+When the destination is a React Native app, convert to Reanimated. The `resolve` facts
+map directly; the differences from Framer are the primitives, the style shape, and that
+**Reanimated durations are milliseconds, not seconds** — pass `resolvedEndMs −
+resolvedStartMs` and `resolvedStartMs` straight through, no ÷1000.
+
+```tsx
+import Animated, {
+  useSharedValue, useAnimatedStyle, withTiming, withSpring, withDelay, Easing,
+} from 'react-native-reanimated';
+import { useEffect } from 'react';
+
+// From resolve: opacity eased 0→1 delay 0 dur 260 HOUSE; y spring 60→0 win 0–600 bounce 0.45
+function Card() {
+  const opacity = useSharedValue(0); // = from
+  const y = useSharedValue(60);      // = from
+
+  useEffect(() => {
+    opacity.value = withDelay(0, withTiming(1, { duration: 260, easing: Easing.bezier(0.59, 0.01, 0.4, 0.98) }));
+    y.value = withDelay(0, withSpring(0, { duration: 600, dampingRatio: 0.55 })); // 1 − bounce
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: y.value }],
+  }));
+
+  return <Animated.View style={style}>{/* … */}</Animated.View>;
+}
+```
+
+Rules specific to this target:
+
+- **Eased value** → `withTiming(to, { duration, easing: Easing.bezier(a, b, c, d) })`,
+  from the `ease` control points. **Spring** → `withSpring(to, { duration, dampingRatio })`
+  where `dampingRatio = 1 − bounce` (clamp to `(0, 1]`; `bounce 0 → 1`). These are the
+  same durations and the same bounce Loupe tuned, so the feel carries over.
+- **`delay`** → wrap in `withDelay(resolvedStartMs, …)`. Zero delay: keep or drop
+  `withDelay`, your call.
+- **Style shape** — RN is not CSS. `opacity` is a flat style key; everything
+  positional goes in a `transform` array, in order: web `y` → `{ translateY }`, `x` →
+  `{ translateX }`, `scale` → `{ scale }`, `rotate` → `{ rotate: '<deg>' }`. Combine
+  several on one element into one `transform` array.
+- **Trigger** — set each `.value` in a mount `useEffect` (play-once, matching the web
+  default). If it should loop, `withRepeat(…, -1)`.
+- **Component** — `Animated.View` / `Animated.Text` from `react-native-reanimated`, not
+  `motion.div`.
+
+Reanimated is a peer the host app already has; don't add it. Everything `resolve`
+refuses is still refused here — the target doesn't change the honesty boundary.
+
 ## Playback — read it, don't assume it
 
 For **Framer** scenes, Loupe's loop is a review artifact. Production plays once on
