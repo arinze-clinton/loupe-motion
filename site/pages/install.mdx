@@ -1,0 +1,84 @@
+# Install
+
+```bash
+npm install @arinze-clinton/loupe -D
+npx loupe init
+```
+
+> Using pnpm / yarn / bun? Swap `npx` for `pnpm exec`, `yarn`, or `bun x`.
+
+`loupe init` wires the providers, writes a sample scene, and (if you say yes)
+installs the Claude skills so you can drive Loupe in plain English.
+
+## Wire it by hand
+
+If you'd rather set it up yourself, wrap your app once. The order matters — the
+panel reads from both providers, so both sit above it:
+
+```tsx
+import { LoupeRegistryProvider, AnnotationsProvider, LoupePanel } from '@arinze-clinton/loupe';
+
+function App() {
+  return (
+    <LoupeRegistryProvider>
+      <AnnotationsProvider>
+        <YourApp />
+        {import.meta.env.DEV && <LoupePanel />}
+      </AnnotationsProvider>
+    </LoupeRegistryProvider>
+  );
+}
+```
+
+The panel is gated on `import.meta.env.DEV`, so it only shows while you're
+working. (Next.js? Use `process.env.NODE_ENV !== 'production'`.)
+
+## Wrap a scene
+
+Any animated scene goes in a `TimelineProvider`, and its values read from the
+shared clock instead of firing on their own:
+
+```tsx
+import { TimelineProvider, useTimelineValue } from '@arinze-clinton/loupe';
+import { motion } from 'framer-motion';
+
+function MyScene() {
+  return (
+    <TimelineProvider
+      config={{
+        id: 'my-scene',
+        label: 'My Scene',
+        phaseOrder: ['enter', 'settle'],
+        phaseDurations: { enter: 600, settle: 400 },
+      }}
+    >
+      <FadingBox />
+    </TimelineProvider>
+  );
+}
+
+function FadingBox() {
+  const opacity = useTimelineValue(0, 1, { phase: 'enter' });
+  return <motion.div style={{ opacity }}>Hello</motion.div>;
+}
+```
+
+That's the whole setup. The panel finds the scene, the scene reads the clock,
+and you can scrub.
+
+## Already have animations?
+
+You don't have to rewrite by hand. Run:
+
+```bash
+npx loupe scan       # see what's timeline-bound vs fire-and-forget
+npx loupe refactor   # walk each one, before-and-after, with your sign-off
+```
+
+Or, with the skills installed, just ask your agent: *"audit my animations"*.
+
+## Requirements
+
+- React 18+
+- Framer Motion 11+
+- A modern browser

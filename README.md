@@ -23,13 +23,15 @@ npx loupe init
 Wrap your app in one provider and mount the panel in dev:
 
 ```tsx
-import { LoupeRegistryProvider, LoupePanel } from '@arinze-clinton/loupe';
+import { LoupeRegistryProvider, AnnotationsProvider, LoupePanel } from '@arinze-clinton/loupe';
 
 function App() {
   return (
     <LoupeRegistryProvider>
-      <YourApp />
-      {import.meta.env.DEV && <LoupePanel />}
+      <AnnotationsProvider>
+        <YourApp />
+        {import.meta.env.DEV && <LoupePanel />}
+      </AnnotationsProvider>
     </LoupeRegistryProvider>
   );
 }
@@ -121,10 +123,13 @@ Once a scene is wrapped in `<TimelineProvider>`, every animated value reads from
 
 | Command | What it does |
 |---|---|
-| `loupe init` | Wire Loupe into your project. Writes a sample scene + (optionally) installs the Claude skill. |
+| `loupe init` | Wire Loupe into your project. Writes a sample scene + (optionally) installs the Claude skills. |
 | `loupe scan` | Find every animation in your project and report which are timeline-bound vs fire-and-forget. |
 | `loupe refactor` | Walk through each fire-and-forget animation interactively. Show-and-paste, no auto-edits. |
-| `loupe check` | Print the version installed, what's declared in `package.json`, and the latest on npm. |
+| `loupe resolve` | Emit each timeline value's resolved ms window and curve as JSON — the facts the prepare-for-production skill converts from. |
+| `loupe workbench` | Scaffold a standalone page to build an animation in isolation. |
+| `loupe skills` | Install or refresh the bundled Claude skills (`--force`, `--dry-run`). |
+| `loupe check` | Print the version installed, what's declared in `package.json`, the latest on npm, and whether your skills are current. |
 | `loupe uninstall` | Remove `@arinze-clinton/loupe` and the files `loupe init` wrote. Won't touch files you've edited. |
 
 ## Why my scene isn't pickable

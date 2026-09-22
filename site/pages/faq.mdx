@@ -1,0 +1,44 @@
+# FAQ
+
+## Does Loupe ship in my production bundle?
+
+Only if you leave it in. The panel is dev-gated, and the whole point of
+**prepare for production** is handing off plain animation code with no Loupe
+dependency. Tune with it, ship without it.
+
+## Do I have to rewrite my animations?
+
+No. `loupe refactor` (or your agent) walks each fire-and-forget animation and
+shows you the before and after before changing anything. For Framer values it
+rewrites to the shared clock; for GSAP and WAAPI it bridges your existing code
+rather than rewriting it.
+
+## Is this just for Framer Motion?
+
+The timeline runs on Framer, and there are adapters for GSAP, WAAPI, and Lottie
+so those stay as you wrote them and become scrubbable. On the way out,
+prepare-for-production emits Framer, GSAP, CSS, or Reanimated.
+
+## Can I use it without an AI agent?
+
+Yes. `loupe scan`, `loupe refactor`, and the panel all work on their own. The
+agent skills make it faster — plain-English feedback instead of hand-editing —
+but nothing requires them.
+
+## Why can't I select my animated element?
+
+If hovering highlights the page behind your scene, a `pointer-events: none`
+ancestor is hiding it from the picker. Wrap the scene in `<SceneRoot>` instead
+of a bare `div` — it stays pickable in dev and click-through in production.
+
+## Springs don't have a duration — how do they fit a timeline?
+
+A spring is still a function of time. Loupe uses the `{ duration, bounce }`
+form, so a spring settles within its window and scrubs like any other value —
+it just overshoots on the way.
+
+## What does "prepare for production" refuse to do?
+
+Guess. If a value is a conditional, a computed expression, or a hand-written
+easing function, it reports it untouched instead of inventing a number you'd
+ship without noticing.

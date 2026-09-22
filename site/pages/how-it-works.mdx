@@ -1,0 +1,61 @@
+# How it works
+
+Loupe is where you tune motion. You give feedback in plain language, an agent
+makes the edits, and Loupe hands the finished animation off to production. Here
+is the whole loop.
+
+## 1. Bind the animation to the clock
+
+A fire-and-forget animation runs once and you can't inspect it. Bound to a
+`TimelineProvider`, every value becomes a function of one shared clock — so
+pausing is freezing that number, and scrubbing back is setting it to zero.
+`loupe scan` finds what isn't bound yet; `loupe refactor` (or your agent) walks
+each one.
+
+## 2. Scrub, pause, annotate
+
+Open the panel, pick a scene, drag the timeline. Stop on the exact frame
+that's off. Click the element and leave a note — Loupe captures where it is in
+the DOM, which component, and the exact millisecond, then exports it as Markdown
+your agent can act on.
+
+## 3. Tune with words
+
+You never touch an easing menu. You say *"the card lands too hard"* and the
+agent lowers a spring's bounce; *"start the check later"* and it nudges an
+offset. Loupe stays a review surface — the agent is the editor.
+
+## 4. Hand off to production
+
+When it's right, the timeline binding is scaffolding production doesn't need.
+Ask your agent to **prepare it for production** and it converts back to plain
+animation code with no Loupe dependency:
+
+```tsx
+// In Loupe — bound to the shared clock
+const y = useTimelineSpring(40, 0, { phase: 'enter', bounce: 0.4 });
+<motion.div style={{ y }} />
+
+// Handed off — plain Framer Motion, no Loupe
+<motion.div
+  initial={{ y: 40 }}
+  animate={{ y: 0 }}
+  transition={{ type: 'spring', duration: 0.5, bounce: 0.4 }}
+/>
+```
+
+Under the hood the agent runs `loupe resolve`, which does the phase arithmetic
+and hands back each value's exact window and curve — tested against the real
+hooks, so nobody's computing milliseconds in their head. Whatever it can read
+as a literal is safe to convert; anything computed it flags rather than guesses.
+Your Loupe version stays the master copy: tweak, re-export, replace.
+
+Framer stays Framer and GSAP stays GSAP. Heading to React Native? The same
+facts convert to Reanimated — `withTiming` and `withSpring`, same durations and
+bounce.
+
+## Rather build in isolation?
+
+When the real page is awkward to work in, `npx loupe workbench` scaffolds a
+standalone page with a starter scene and the panel. Build there, then hand off
+the same way.
