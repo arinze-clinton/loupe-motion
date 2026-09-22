@@ -28,11 +28,29 @@ jobs:
       - name: Build
         run: npm run build
 
-      # Skip publishing if this version is already on the registry.
-      # Enables re-pushing old tags (e.g. for retroactive Releases)
-      # without crashing the workflow on "version already published".
+      # Verify the npm token actually authenticates BEFORE trying to publish.
+      # A missing or expired NPM_TOKEN should be a green skip with a clear
+      # nudge, not a red failure that emails on every release. The moment a
+      # valid token is set in Settings → Secrets → Actions, this passes and
+      # the publish runs for real.
+      - name: Verify npm auth
+        id: auth
+        run: |
+          if npm whoami >/dev/null 2>&1; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=npm publish skipped::NPM_TOKEN is missing or expired — skipping publish. Refresh it in Settings → Secrets → Actions (NPM_TOKEN) to enable automated releases."
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Skip publishing if this version is already on the registry — lets a
+      # local `npm publish` and this workflow coexist without racing: whoever
+      # gets there first wins, the other sees "already published" and skips.
       - name: Check if already published
         id: check
+        if: steps.auth.outputs.ok == 'true'
         run: |
           VERSION=$(node -p "require('./package.json').version")
           if npm view "@arinze-clinton/loupe@$VERSION" version >/dev/null 2>&1; then
@@ -43,7 +61,7 @@ jobs:
           fi
 
       - name: Publish
-        if: steps.check.outputs.already != 'true'
+        if: steps.auth.outputs.ok == 'true' && steps.check.outputs.already != 'true'
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
