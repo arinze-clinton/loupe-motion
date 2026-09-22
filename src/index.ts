@@ -34,7 +34,7 @@ export {
 export { SceneRoot, SCENE_ROOT_ATTR } from './runtime/SceneRoot';
 
 // Panel — the floating dev UI.
-export { LoupePanel } from './panel/LoupePanel';
+export { LoupePanel, type LoupePanelProps } from './panel/LoupePanel';
 
 // Annotations — provider + visual layers.
 export {

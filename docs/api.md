@@ -28,6 +28,15 @@ Manages the active scene's annotation list. Reads `activeSceneId` from the regis
 
 The floating dev UI. Renders at the bottom of the viewport. Drag to move; position persists in `localStorage`.
 
+**`embedded?: boolean`** — dock the panel inside its container instead of the viewport. It then positions `absolute` (relative to the nearest positioned ancestor), sizes to that container, doesn't drag, and keeps no `localStorage` state — so several embedded panels can live on one page without colliding or hijacking the viewport. Requires a positioned container (e.g. `position: relative`). Useful for inline demos and docs.
+
+```tsx
+<div style={{ position: 'relative', height: 400 }}>
+  <TimelineProvider config={scene}><Scene /></TimelineProvider>
+  <LoupePanel embedded />
+</div>
+```
+
 ### `<AnnotationOverlay>`
 
 Full-viewport interaction layer used during element/region picking and draft editing. Render alongside `<LoupePanel>`.

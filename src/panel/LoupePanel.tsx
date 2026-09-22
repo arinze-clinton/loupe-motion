@@ -45,7 +45,21 @@ import {
   PANEL_BG, PANEL_FG, PANEL_MUTED, PANEL_BORDER, PANEL_HIGHLIGHT,
 } from './theme';
 
-export function LoupePanel() {
+export type LoupePanelProps = {
+  /**
+   * Embed the panel inside its container instead of docking it to the
+   * viewport. The panel then positions `absolute` (relative to the nearest
+   * positioned ancestor), sizes to that container rather than the window,
+   * doesn't drag, and keeps no localStorage state — so several embedded
+   * panels can coexist on one page (docs demos, inline tools) without
+   * colliding or hijacking the viewport. Requires a positioned container
+   * (e.g. `position: relative`). Defaults to false — the normal floating dev
+   * panel.
+   */
+  embedded?: boolean;
+};
+
+export function LoupePanel({ embedded = false }: LoupePanelProps = {}) {
   const registry = useLoupeRegistry();
   const [sampleActive, setSampleActive] = useState(false);
   const activeScene = registry.activeSceneId
@@ -57,6 +71,7 @@ export function LoupePanel() {
   // `null` explicitly means "user picked None, stay collapsed".
   const sceneHydratedRef = useRef(false);
   useEffect(() => {
+    if (embedded) return; // embedded panels keep no persisted selection
     if (sceneHydratedRef.current) return;
     sceneHydratedRef.current = true;
     try {
@@ -77,6 +92,7 @@ export function LoupePanel() {
 
   // Persist every explicit change so refreshes preserve it.
   useEffect(() => {
+    if (embedded) return; // ephemeral when embedded
     try {
       localStorage.setItem(
         LOUPE_ACTIVE_SCENE_KEY,
@@ -180,6 +196,7 @@ export function LoupePanel() {
 
   const hydratedRef = useRef(false);
   useEffect(() => {
+    if (embedded) return; // embedded panels start centered, don't restore
     if (hydratedRef.current) return;
     if (panelSize.w === 0) return;
     hydratedRef.current = true;
@@ -242,6 +259,7 @@ export function LoupePanel() {
   }, [clampToViewport, panelSize.w, panelSize.h, x, y]);
 
   const persistPosition = () => {
+    if (embedded) return; // ephemeral when embedded
     try {
       localStorage.setItem(LOUPE_POSITION_KEY, JSON.stringify({ x: x.get(), y: y.get() }));
     } catch {
@@ -274,9 +292,10 @@ export function LoupePanel() {
     if (registry.scenes.length === 0) {
       return (
         <>
-          <Welcome />
+          {!embedded && <Welcome />}
           {sampleNode}
           <EmptyPanel
+            embedded={embedded}
             onTrySample={() => {
               setSampleActive(true);
               // Pre-select the sample so when it registers the panel
@@ -290,9 +309,10 @@ export function LoupePanel() {
     }
     return (
       <>
-        <Welcome />
+        {!embedded && <Welcome />}
         {sampleNode}
         <CollapsedPanel
+        embedded={embedded}
         registry={registry}
         dragControls={dragControls}
         x={x}
@@ -308,9 +328,10 @@ export function LoupePanel() {
 
   return (
     <>
-    <Welcome />
+    {!embedded && <Welcome />}
     {sampleNode}
     <ActiveScenePanel
+      embedded={embedded}
       registry={registry}
       activeScene={activeScene}
       pickerMode={pickerMode}
@@ -344,16 +365,16 @@ type ActiveScene = NonNullable<ReturnType<Registry['scenes']['find']>>;
  * Loupe's built-in demo scene. The designer learns the panel's real
  * mechanics in the empty state.
  */
-function EmptyPanel({ onTrySample }: { onTrySample: () => void }) {
+function EmptyPanel({ onTrySample, embedded = false }: { onTrySample: () => void; embedded?: boolean }) {
   return (
     <div
       data-loupe-ui
       style={{
-        position: 'fixed',
+        position: embedded ? 'absolute' : 'fixed',
         left: '50%',
         bottom: 16,
         transform: 'translateX(-50%)',
-        width: 'min(1024px, calc(100vw - 32px))',
+        width: embedded ? 'min(1024px, calc(100% - 32px))' : 'min(1024px, calc(100vw - 32px))',
         zIndex: 10050,
         pointerEvents: 'none',
       }}
@@ -575,6 +596,7 @@ function CollapsedPanel({
   setPanelSize,
   persistPosition,
   dragConstraints,
+  embedded = false,
 }: {
   registry: Registry;
   dragControls: ReturnType<typeof useDragControls>;
@@ -584,6 +606,7 @@ function CollapsedPanel({
   setPanelSize: (size: { w: number; h: number }) => void;
   persistPosition: () => void;
   dragConstraints: { left: number; right: number; top: number; bottom: number };
+  embedded?: boolean;
 }) {
   // Track the collapsed pill's size so constraints stay honest if
   // user drags to viewport edges.
@@ -608,7 +631,7 @@ function CollapsedPanel({
     // `pointer-events-none`). Without `position: fixed` here the
     // pill drops into normal document flow and renders below the
     // page content instead of floating at the bottom-center.
-    position: 'fixed',
+    position: embedded ? 'absolute' : 'fixed',
     pointerEvents: 'none',
     bottom: 16,
     left: '50%',
@@ -618,7 +641,7 @@ function CollapsedPanel({
 >
   <motion.div
     ref={panelRef}
-    drag
+    drag={!embedded}
     dragListener={false}
     dragControls={dragControls}
     dragMomentum={false}
@@ -697,6 +720,7 @@ function ActiveScenePanel({
   dragConstraints,
   panelRef,
   viewportW,
+  embedded = false,
 }: {
   registry: Registry;
   activeScene: ActiveScene;
@@ -715,6 +739,7 @@ function ActiveScenePanel({
   dragConstraints: { left: number; right: number; top: number; bottom: number };
   panelRef: React.MutableRefObject<HTMLDivElement | null>;
   viewportW: number;
+  embedded?: boolean;
 }) {
   const isMobile = viewportW < 640;
   const tl = activeScene.timeline;
@@ -780,11 +805,11 @@ function ActiveScenePanel({
       <motion.div
         data-loupe-ui
         style={{
-          position: 'fixed',
+          position: embedded ? 'absolute' : 'fixed',
           left: '50%',
           transform: 'translateX(-50%)',
           bottom: 16,
-          width: 'min(1024px, calc(100vw - 32px))',
+          width: embedded ? 'min(1024px, calc(100% - 32px))' : 'min(1024px, calc(100vw - 32px))',
           zIndex: 10050,
           display: 'flex',
           pointerEvents: 'none',
@@ -793,7 +818,7 @@ function ActiveScenePanel({
         <motion.div
           ref={panelRef}
           layout
-          drag
+          drag={!embedded}
           dragListener={false}
           dragControls={dragControls}
           dragMomentum={false}
